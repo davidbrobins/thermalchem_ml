@@ -78,3 +78,55 @@ def generate_ics_file(f_H2, x_N, x_C, x_O, x_S, x_Si, x_Na, x_Mg, x_Fe, x_P, x_F
     # Write the abundances to a file
     abundances.to_string(buf = file_path, header = False)
 
+# Function to run the sampler
+def sampling(num_samples, batch_num = 0):
+    '''
+    Inputs:
+    num_samples (int): Number of samples per batch
+    batch_num (int): Number of batches sampled previously (to ensure reproducibility, defaults to 0)
+    Outputs:
+    scaled_samples (d*num_samples ndarray): multidimensional array with num_samples instances of d samples
+    '''
+
+    # Initialize the sampler (specify random seed for reproducibility)
+    sampler = qmc.LatinHypercube(d = 10, seed = 3395)
+    # Fastforward by num_samples * batch_num to ensure consistency
+    sampler.fast_forward(n = num_samples * batch_num)
+    # Generate num_samples samples from the d-dimensional unit hypercube
+    unscaled_samples = sampler.random(n = num_samples)
+
+    # Define lower and upper limits to rescale the d-dimensional unit hypercube to our parameter space
+    # In order, the parameters sampled are:
+    # [log(T_gas), log(n_gas), log(G0_UV), log(f_H2), log(cell_thickness_pc), 
+    #  log(x_N), log(x_C), log(x_O), log(x_S), log(x_Si), log(x_Na), log(x_Mg), 
+    #  log(x_Fe), log(x_P), log(x_F), log(x_Cl)]
+    lower_bounds = []
+    upper_bounds = []
+    # Scale the samples
+    scaled_samples = qmc.scale(unscaled_samples, lower_bounds, upper_bounds)
+
+    # Return the scaled samples
+    return scaled_samples
+
+# Function to run the sampling procedure and generate all chempl files for each sample
+def generate_chempl_files(num_samples, batch_num, file_directory):
+    '''
+    Inputs:
+    num_samples (int): Number of samples per batch
+    batch_num (int): Number of batches sampled so far
+    file_directory (str): Filepath to store chempl files
+    Outputs:
+    None (chempl files corresponding to the sampled parameters will be written to file_directory)
+    '''
+
+    # Call the sampler to generate num_samples samples
+
+    
+
+    
+
+
+
+
+
+
