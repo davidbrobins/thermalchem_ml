@@ -7,13 +7,12 @@ import numpy as np # Numpy for math
 import pandas as pd # Pandas for dataframe handling
 
 # Function to generate physical parameters file for Chempl from sampled parameters
-def generate_phy_params_file(T_gas, n_gas, G0_UV, f_H2, cell_thickness_pc, file_path):
+def generate_phy_params_file(T_gas, n_gas, G0_UV, cell_thickness_pc, file_path):
     '''
     Inputs:
     T_gas (float): Gas temperature [K]
     n_gas (float): Gas (hydrogen) number density [cm^-3]
     G0_UV (float): Radiation field strength (in units of Draine field)
-    f_H2 (float): Initial fraction of hydrogen in the form of H2 (in the interval [0, 1])
     cell_thickness_pc (float): Cell thickness [pc]
     file_path (str): Path to the file where the physical parameters will be written (must include the file name)
     Outputs:
@@ -26,8 +25,6 @@ def generate_phy_params_file(T_gas, n_gas, G0_UV, f_H2, cell_thickness_pc, file_
     cell_thickness_cm = cell_thickness_pc * pc_to_cm
     # Calculate hydrogen column density in cm^-2
     N_H = n_gas * cell_thickness_cm
-    # Calculate H2 column density
-    N_H2 = N_H * f_H2
     # Calculate dust extinction A_V
     N_H_to_A_V_ratio = 5.3e-22 # Draine "Physics of the Interstellar and Intergalactic Medium", equation 21.7
     A_V = N_H * N_H_to_A_V_ratio
@@ -39,7 +36,29 @@ def generate_phy_params_file(T_gas, n_gas, G0_UV, f_H2, cell_thickness_pc, file_
                       (2.78 ** 5) + 3.4e-2 * (0.42 - opt_depth * (T_0 ** 6) * 
                                               np.log(3.5e-2 * opt_depth * T_0)),
                       0.2)
-    
+    # Calculate f_H2 from the fitting formula of Polzin et al. 2024
+    # Needed parameters
+    metallicity = 1 # Z/Z_sun
+    R0 = 3.5e-17 # H2 formation rate on dust grains (Wolfire et al. 2008)
+    dust_to_gas_ratio = 1e-2 # dust-to-gas mass ratio (chempl default value)
+    U_MW = 1 * (G0_UV / 1.14) # DR: change the '1' prefactor to U_MW for the MMP83 fit
+    # Equation 4
+    Q = 6 * R0 * n_gas * (metallicity / 0.2) ** (1.3) # In Myr
+    # Equation 5
+    f_m = 1 - np.exp(-1 * Q)
+    # Equation 2
+    f_H2_max = (1 + 2 * (1 - f_m) / f_m) ** (-1)
+    # Equation 7
+    a = (34.7 * (U_MW ** 0.32)) - 2.25 * ((dust_to_gas_ratio / 0.0199) ** 0.3)
+    b = -53.8 * (U_MW ** 0.31)
+    c = dust_to_gas_ratio / (0.2 * 0.0199)
+    n_tr = b - (a * np.log10(dust_to_gas_ratio)) + c # Transition density
+    # Equations 5-6
+    x = 7.6 * (metallicity ** 0.25) * np.log(n_gas / n_tr)
+    # Equation 1
+    f_H2 = f_H2_max / (1 + np.exp(7.42 - x + np.log(f_H2_max)))
+    # Calculate H2 column density
+    N_H2 = N_H * f_H2
     # Write the physical parameters to the file
     f = open(file_path, 'w') # Open file in writing mode
     f.write('T_gas = ' + str(T_gas) + '\n') # Write gas temperature
