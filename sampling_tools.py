@@ -6,15 +6,17 @@ from scipy.stats import qmc # Multi-dimensional quasi-Monte Carlo sampling from 
 import numpy as np # Numpy for math
 import pandas as pd # Pandas for dataframe handling
 
-# Function to generate physical parameters file for Chempl from sampled parameters
-def generate_phy_params_file(T_gas, n_gas, G0_UV, cell_thickness_pc, file_path):
+# Function to generate files for Chempl run (physical parameters, initial conditions, and a runfile) from sampled parameters
+def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, dir_path, specific_abundances = {}):
     '''
     Inputs:
     T_gas (float): Gas temperature [K]
     n_gas (float): Gas (hydrogen) number density [cm^-3]
     G0_UV (float): Radiation field strength (in units of Draine field)
     cell_thickness_pc (float): Cell thickness [pc]
-    file_path (str): Path to the file where the physical parameters will be written (must include the file name)
+    metallicity (float): Initial metallicity in units of Z/Z_sun
+    dir_path (str): Path to the directory where the files will be written (should be an absolute path)
+    specific_abundances (dir): Dictionary containing any desired initial chemical abundances that differ from the overall metallicity (defaults to an empty dictionary)
     Outputs:
     None (writes file containing physical parameters for chempl run to file_path)
     '''
@@ -41,7 +43,8 @@ def generate_phy_params_file(T_gas, n_gas, G0_UV, cell_thickness_pc, file_path):
     metallicity = 1 # Z/Z_sun
     R0 = 3.5e-17 # H2 formation rate on dust grains (Wolfire et al. 2008)
     dust_to_gas_ratio = 1e-2 # dust-to-gas mass ratio (chempl default value)
-    U_MW = 1 * (G0_UV / 1.14) # DR: change the '1' prefactor to U_MW for the MMP83 fit
+    # Scale 1000A value of U_MW = J_1000A/J_MW from Draine 1978 by appropriate G0 from Draine ISM book
+    U_MW = 0.662 * (G0_UV / 1.69) 
     # Equation 4
     Q = 6 * R0 * n_gas * (metallicity / 0.2) ** (1.3) # In Myr
     # Equation 5
@@ -60,7 +63,7 @@ def generate_phy_params_file(T_gas, n_gas, G0_UV, cell_thickness_pc, file_path):
     # Calculate H2 column density
     N_H2 = N_H * f_H2
     # Write the physical parameters to the file
-    f = open(file_path, 'w') # Open file in writing mode
+    f = open(dir_path + 'phy_params.dat', 'w') # Open file in writing mode
     f.write('T_gas = ' + str(T_gas) + '\n') # Write gas temperature
     f.write('n_gas = ' + str(n_gas) + '\n') # Write gas density
     f.write('G0_UV = ' + str(G0_UV) + '\n') # Write radiation field strength
@@ -69,33 +72,40 @@ def generate_phy_params_file(T_gas, n_gas, G0_UV, cell_thickness_pc, file_path):
     f.write('T_dust = ' + str(T_dust) + '\n') # Write dust temperature
     f.close() # Close the file
 
-# Function to generate ICs file for Chempl from the sampled parameters
-def generate_ics_file(f_H2, x_N, x_C, x_O, x_S, x_Si, x_Na, x_Mg, x_Fe, x_P, x_F, x_Cl, file_path):
-    '''
-    Inputs:
-    f_H2 (float): Initial fraction of hydrogen in (neutral) molecular form (in the interval [0, 1])
-    x_N (float): Initial abundance of nitrogen (all abundances x_i = n_i/n_H)
-    x_C (float): Initial abundance of carbon
-    x_O (float): Initial abundance of oxygen
-    x_S (float): Initial abundance of sulfur
-    x_Si (float): Initial abundance of silicon
-    x_Na (float): Initial abundance of sodium
-    x_Mg (float): Initial abundance of magnesium
-    x_Fe (float): Initial abundance of iron
-    x_P (float): Initial abundance of phosphorus
-    x_F (float): Initial abundance of flourine
-    x_Cl (float): Initial abundance of chlorine
-    file_path (str): Path to the file where the physical parameters will be written (must include the file name)
-    Outputs:
-    None (writes file containing physical parameters for chempl run to file_path)
-    '''
+    # Set the initial abundances
+    # by scaling the solar metal abundances from Asplund et al. 2009 by the overall metallicity
+    initial_abundances = {'H2' : f_H2, # H2 abundance is just the H2 fraction
+                          'H' : 1 - f_H2, # All remainoing hydrogen is in atomic form
+                          'He' : 10**(10.93 - 12), # Fractional helium abundance
+                          'C' : metallicity * 10 ** (8.43 - 12), # Carbon abundance (all metals below scaled by the overall metallicity)
+                          'N' : metallicity * 10 ** (7.83 - 12), # Nitrogen abundance
+                          'O' : metallicity * 10 ** (8.69 - 12), # Oxygen abundance
+                          'F' : metallicity * 10 ** (4.56 -12), # Flourine abundance
+                          'Na' : metallicity * 10 ** (6.24 - 12), # Sodium abundance
+                          'Mg' : metallicity * 10 ** (7.60 -12), # Magnesium abundance
+                          'Si' : metallicity * 10 ** (7.51 - 12), # Silicon abundance
+                          'P' : metallicity * 10 ** (5.41 - 12), # Phosphorus abundance
+                          'S' : metallicity * 10 ** (7.12 - 12), # Sulfur abundance
+                          'Cl' : metallicity * 10 ** (5.50 - 12), # Chlorine abundance
+                          'Fe' : metallicity * 10 ** (7.50 -12) # Iron abundance
+    }
+    # Check for any additional or modified abundances in the optional dictionary
+    for species in specific_abundances:
+        # Set the abundance of that species as specified (overwrites or creates a new entry as needed)
+        initial_abundances[species] = specific_abundances[species]
+    # Convert the initial abundances to a pandas Series
+    initial_abundances = pd.Series(initial_abundances)
+    # Write this series to a file
+    initial_abundances.to_string(buf = dir_path + 'initial_abundances.dat', header = False)
 
-    # Package all abundances as a pandas Series 
-    abundances = pd.Series({'H2': f_H2, # Helium?
-                            'N': x_N, 'C': x_C, # Do any of the ions need to be charged?
-                            })
-    # Write the abundances to a file
-    abundances.to_string(buf = file_path, header = False)
+    # Write the run file
+    f = open(dir_path + 'run_file.dat', 'w') # Create and open the file
+    f.write('f_phy_params = ' + dir_path + 'phy_params.dat\n') # Specify the full path to the physical parameters file created above
+    f.write('f_reactions = rate12_combined.dat\n') # Specify the reaction rates file
+    f.write('f_initial_abundances = ' + dir_path + 'initial_abundances.dat\n') # Specify the path to the initial conditions file created above
+    f.write('f_enthalpies = Species_enthalpy.dat\n') # Specify the enthalpies file
+    f.write('f_record = ' + dir_path + 'results.dat\n') # Specify the path where the results file will be created
+    f.close() # Close the file
 
 # Function to run the sampler
 def sampling(num_samples, batch_num = 0):
@@ -126,26 +136,3 @@ def sampling(num_samples, batch_num = 0):
 
     # Return the scaled samples
     return scaled_samples
-
-# Function to run the sampling procedure and generate all chempl files for each sample
-def generate_chempl_files(num_samples, batch_num, file_directory):
-    '''
-    Inputs:
-    num_samples (int): Number of samples per batch
-    batch_num (int): Number of batches sampled so far
-    file_directory (str): Filepath to store chempl files
-    Outputs:
-    None (chempl files corresponding to the sampled parameters will be written to file_directory)
-    '''
-
-    # Call the sampler to generate num_samples samples
-
-    
-
-    
-
-
-
-
-
-
