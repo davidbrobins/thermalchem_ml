@@ -70,6 +70,7 @@ def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, d
     f.write('Ncol_H2 = ' + str(N_H2) + '\n') # Write H2 column density
     f.write('Av = ' + str(A_V) + '\n') # Write dust extinction
     f.write('T_dust = ' + str(T_dust) + '\n') # Write dust temperature
+    f.write('t_max_year = 1e8') # Write t_stop = 10^8 yr
     f.close() # Close the file
 
     # Set the initial abundances
@@ -104,7 +105,7 @@ def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, d
     f.write('f_reactions = rate12_combined.dat\n') # Specify the reaction rates file
     f.write('f_initial_abundances = ' + dir_path + 'initial_abundances.dat\n') # Specify the path to the initial conditions file created above
     f.write('f_enthalpies = Species_enthalpy.dat\n') # Specify the enthalpies file
-    f.write('f_record = ' + dir_path + 'results.dat\n') # Specify the path where the results file will be created
+    f.write('f_record = ' + dir_path + 'results.dat') # Specify the path where the results file will be created
     f.close() # Close the file
 
 # Function to run the sampler
