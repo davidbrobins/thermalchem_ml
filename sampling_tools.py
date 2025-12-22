@@ -93,9 +93,9 @@ def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, d
                           'C' : metallicity * 10 ** (8.43 - 12), # Carbon abundance (all metals below scaled by the overall metallicity)
                           'N' : metallicity * 10 ** (7.83 - 12), # Nitrogen abundance
                           'O' : metallicity * 10 ** (8.69 - 12), # Oxygen abundance
-                          'F' : metallicity * 10 ** (4.56 -12), # Flourine abundance
+                          'F' : metallicity * 10 ** (4.56 - 12), # Flourine abundance
                           'Na' : metallicity * 10 ** (6.24 - 12), # Sodium abundance
-                          'Mg' : metallicity * 10 ** (7.60 -12), # Magnesium abundance
+                          'Mg' : metallicity * 10 ** (7.60 - 12), # Magnesium abundance
                           'Si' : metallicity * 10 ** (7.51 - 12), # Silicon abundance
                           'P' : metallicity * 10 ** (5.41 - 12), # Phosphorus abundance
                           'S' : metallicity * 10 ** (7.12 - 12), # Sulfur abundance
@@ -163,7 +163,7 @@ def sampling(num_samples, samples_dir_path, batch_num = 0,
         log_ct_min = np.log10(jeans_length_pc / 10)
         log_ct_max = np.log10(jeans_length_pc * 10)
         # Linearly rescale x in [0, 1] to [log(Jeans length/10), log(Jeans length * 10)]
-        log_ct_pc = log_ct_min + unscaled_sample[0] * (log_ct_max - log_ct_min)
+        log_ct_pc = log_ct_min + unscaled_sample[3] * (log_ct_max - log_ct_min)
 
         # Exponentiate the values and store them in scaled_samples
         scaled_samples[index] = [10 ** log_T_gas, 10 ** log_n_gas, 10 ** log_G0_UV, 10 ** log_ct_pc]
