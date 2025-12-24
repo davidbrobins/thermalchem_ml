@@ -145,24 +145,22 @@ def sampling(num_samples, samples_dir_path, batch_num = 0,
     sampler.fast_forward(n = num_samples * batch_num)
     # Generate num_samples samples from the 4-dimensional unit hypercube
     unscaled_samples = sampler.random(n = num_samples)
-    print('Samples from unit hypercube:')
-    print(unscaled_samples) # Test print
 
     # Scale the samples to the approprate intervals 
     scaled_samples = unscaled_samples # Initialize an object to hold the scaled samples
     # Iterate through samples (since cell_thickness_pc range is defined based on T_gas, n_gas values for each sample)
     for index in range(num_samples):
         unscaled_sample = unscaled_samples[index]
-        # Linearly rescale x in [0, 1] to [log(min), log(max)]
+        # Linearly rescale x in [0, 1] to get log(sample) in correct range
         log_T_gas = np.log10(T_gas_min) + unscaled_sample[0] * (np.log10(T_gas_max) - np.log10(T_gas_min))
         log_n_gas = np.log10(n_gas_min) + unscaled_sample[1] * (np.log10(n_gas_max) - np.log10(n_gas_min))
         log_G0_UV = np.log10(G0_UV_min) + unscaled_sample[2] * (np.log10(G0_UV_max) - np.log10(G0_UV_min))
         # Calculate Jeans length in pc
         jeans_length_pc = 17 * np.sqrt((10 ** (log_T_gas)) / (10 ** (log_n_gas)))
-        # Get min, max values of cell_thickness_pc
-        log_ct_min = np.log10(jeans_length_pc / 10)
+        # Get min, max values to sample in [0.01, 10] * jeans_length_pc
+        log_ct_min = np.log10(jeans_length_pc / 100)
         log_ct_max = np.log10(jeans_length_pc * 10)
-        # Linearly rescale x in [0, 1] to [log(Jeans length/10), log(Jeans length * 10)]
+        # Linearly rescale x in [0, 1] to get log(cell thickness) in correct range
         log_ct_pc = log_ct_min + unscaled_sample[3] * (log_ct_max - log_ct_min)
 
         # Exponentiate the values and store them in scaled_samples
@@ -173,9 +171,16 @@ def sampling(num_samples, samples_dir_path, batch_num = 0,
         path_name = samples_dir_path + str(index + batch_num * num_samples).zfill(6) + '/'
         directory_path = Path(path_name)
         directory_path.mkdir(exist_ok = True)
+        # Write a .dat file containing the sampled parameters (needed as inputs to the emulator)
+        sample_df = pd.Series({'T_gas' : 10 ** log_T_gas, 'n_gas' : 10 ** log_n_gas,
+                               'G0_UV' : 10 ** log_G0_UV, 'cell_thickness_pc' : 10 ** log_ct_pc})
+        sample_df.to_string(buf = path_name + 'initial_abundances.dat', header = False)
         # Generate the needed chempl files
         generate_chempl_files(10 ** log_T_gas, 10 ** log_n_gas, 10 ** log_G0_UV, 10 ** log_ct_pc, # Sampled parameters
                               metallicity = 1, dir_path = path_name)
 
     # Return the scaled samples
     return scaled_samples
+
+# Test sampling
+sampling(20, '.', 0)
