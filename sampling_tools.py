@@ -181,6 +181,3 @@ def sampling(num_samples, samples_dir_path, batch_num = 0,
 
     # Return the scaled samples
     return scaled_samples
-
-# Test sampling
-sampling(20, '.', 0)
