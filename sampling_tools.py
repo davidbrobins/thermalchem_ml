@@ -121,14 +121,14 @@ def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, d
     f.close() # Close the file
 
 # Function to run the sampler
-def sampling(num_samples, samples_dir_path, batch_num = 0, 
+def sampling(num_samples, samples_dir_path, prev_samples = 0, 
              T_gas_min = 1e1, T_gas_max = 1e4, n_gas_min = 1e1, 
              n_gas_max = 1e6, G0_UV_min = 1e-2, G0_UV_max = 1e3):
     '''
     Inputs:
     num_samples (int): Number of samples per batch
     samples_dir_path (str): Directory where sample files will be written
-    batch_num (int): Number of batches sampled previously (to ensure reproducibility, defaults to 0)
+    prev_samples (int): Number of previously saved samples (to ensure reproducibility, defaults to 0)
     T_gas_min (float): Lower limit of T_gas range to sample, in K (defaults to 10)
     T_gas_max (float): Upper limit of T_gas range to sample, in K (defaults to 10^4)
     n_gas_min (float): Lower limit of n_gas range to sample, in cm^-3 (deafults to 10)
@@ -141,8 +141,8 @@ def sampling(num_samples, samples_dir_path, batch_num = 0,
 
     # Initialize the sampler (specify random seed for reproducibility)
     sampler = qmc.LatinHypercube(d = 4, seed = 3395)
-    # Fastforward by num_samples * batch_num to ensure consistency
-    sampler.fast_forward(n = num_samples * batch_num)
+    # Fastforward by prev_samples to ensure consistency
+    sampler.fast_forward(n = prev_samples)
     # Generate num_samples samples from the 4-dimensional unit hypercube
     unscaled_samples = sampler.random(n = num_samples)
 
@@ -167,8 +167,8 @@ def sampling(num_samples, samples_dir_path, batch_num = 0,
         scaled_samples[index] = [10 ** log_T_gas, 10 ** log_n_gas, 10 ** log_G0_UV, 10 ** log_ct_pc]
     
         # Create the chempl files corresponding to this file
-        # Create a directory corresponding to this file index (starting at batch_num * num_samples)
-        path_name = samples_dir_path + str(index + batch_num * num_samples).zfill(6) + '/'
+        # Create a directory corresponding to this file index (starting at prev_samples)
+        path_name = samples_dir_path + str(index + prev_samples).zfill(6) + '/'
         directory_path = Path(path_name)
         directory_path.mkdir(exist_ok = True)
         # Write a .dat file containing the sampled parameters (needed as inputs to the emulator)
