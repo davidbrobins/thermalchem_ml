@@ -32,7 +32,11 @@ def run_chempl(sample_index):
     run_file = samples_dir + str(sample_index).zfill(6) + '/run_file.dat'
     print('Run file being used: ', run_file)
     # Run chempl on run_file, changing run location to chempl location (modify as needed for your working tree setup)
-    subprocess.run(['./re', run_file], capture_output = True, cwd = '~/code/chempl/')
+    chempl_run = subprocess.run(['./re', run_file], capture_output = True, text = True, 
+                                 cwd = '/home/drobinson/code/chempl/')
+    # Print any errors and output
+    print('Errors: ', chempl_run.stderr)
+    print('Output: ', chempl_run.stdout)
 
 # Run chempl in parallel across multiple processors (here, 8)
 if __name__ == "__main__": 
