@@ -174,7 +174,7 @@ def sampling(num_samples, samples_dir_path, prev_samples = 0,
         # Write a .dat file containing the sampled parameters (needed as inputs to the emulator)
         sample_df = pd.Series({'T_gas' : 10 ** log_T_gas, 'n_gas' : 10 ** log_n_gas,
                                'G0_UV' : 10 ** log_G0_UV, 'cell_thickness_pc' : 10 ** log_ct_pc})
-        sample_df.to_string(buf = path_name + 'initial_abundances.dat', header = False)
+        sample_df.to_string(buf = path_name + 'sampled_params.dat', header = False)
         # Generate the needed chempl files
         generate_chempl_files(10 ** log_T_gas, 10 ** log_n_gas, 10 ** log_G0_UV, 10 ** log_ct_pc, # Sampled parameters
                               metallicity = 1, dir_path = path_name)
