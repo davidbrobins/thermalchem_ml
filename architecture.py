@@ -42,7 +42,7 @@ class Decoder(nn.Module):
         super().__init__()
         self.flatten = nn.Flatten()
         # Structure is the encoder linear layers in reverse
-        self.sequence = nn.Sequential(
+        self.operations = nn.Sequential(
             nn.Linear(in_features = latent_dim, out_features = 16),
             nn.Tanh(),
             nn.Linear(in_features = 16, out_features = 32),
@@ -53,5 +53,5 @@ class Decoder(nn.Module):
 
     def forward(self, latents):
         latents = self.flatten(latents)
-        outputs = self.flatten(latents)
+        outputs = self.operations(latents)
         return outputs
