@@ -14,14 +14,16 @@ def scale_features(input_tensor):
 
     # Create tensor to hold features
     feature_tensor = torch.zeros_like(input_tensor)
-    # First column will still be times (these are not scaled)
+    # First column will still be sample index (these are not scaled)
     feature_tensor[:, 0] = input_tensor[:, 0]
+    # Second column will still be times (these are not scaled)
+    feature_tensor[:, 1] = input_tensor[:, 1]
 
     # Get number of columns in input_tensor
     num_cols = input_tensor.size()[-1]
 
-    # Loop through abundance, temperature columns
-    for i in range(1, num_cols):
+    # Loop through sampled parameter (2-5) and abundance (6+) columns
+    for i in range(2, num_cols):
         # Get the elements of the column, take logarithm
         col = torch.log10(input_tensor[:, i])
 

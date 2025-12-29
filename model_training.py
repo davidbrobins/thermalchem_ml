@@ -47,13 +47,15 @@ def training_step(encoder, decoder, train_batches, optimizer, loss_function):
 
     # Loop through training batches
     for batch, features in enumerate(train_batches):
-        # Apply encoder to get latent space representation
-        latents = encoder(features)
+        # Extract the abundances from the features (columns 6+)
+        abundances = features[:, 6:]
+        # Apply encoder to abundances get latent space representation
+        latents = encoder(abundances)
         # Apply decoder to get reconstruction in feature space
         reconstruction = decoder(latents)
 
         # Calculate the loss function
-        loss = loss_function(features, reconstruction)
+        loss = loss_function(abundances, reconstruction)
 
         # Backpropagation
         loss.backward()
@@ -91,12 +93,14 @@ def testing_step(encoder, decoder, test_batches, loss_function):
     # WITHOUT calculating gradients
     with torch.no_grad():
         for batch, features in enumerate(test_batches):
+            # Extract the abundances from the input features (columns 6+)
+            abundances = features[:, 6:]
             # Apply encoder to get latent space representation
-            latents = encoder(features)
+            latents = encoder(abundances)
             # Apply decoder to get reconstruction in feature space
             reconstruction = decoder(latents)
             # Calculate loss in this batch
-            batch_loss = loss_function(features, reconstruction)
+            batch_loss = loss_function(abundances, reconstruction)
             # Add this to the total loss
             total_loss += batch_loss
 
