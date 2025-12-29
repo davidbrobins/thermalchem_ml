@@ -27,13 +27,13 @@ class Encoder(nn.Module):
             nn.Tanh()
         )
 
-        # Define the forward mapping of the encoder on a tensor of features 'inputs'
-        def forward(self, inputs):
-            # Flatten inputs
-            inputs = self.flatten(inputs)
-            # Apply the encoder to get the latent space tensor
-            latents = self.operations(inputs)
-            return latents
+    # Define the forward mapping of the encoder on a tensor of features 'inputs'
+    def forward(self, inputs):
+        # Flatten inputs
+        inputs = self.flatten(inputs)
+        # Apply the encoder to get the latent space tensor
+        latents = self.operations(inputs)
+        return latents
         
 
 # Analogously define the decoder
