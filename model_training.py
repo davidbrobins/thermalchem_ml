@@ -17,14 +17,15 @@ class ReconstructionLoss(nn.Module):
         '''
         Inputs:
         input (torch.tensor): Features predicted by the model (after encoder and decoder)
-        Outputs:
         target (torch.tensor): The true original features
+        Outputs:
+        error (float): The mean squared error
         '''
 
         # Square the difference between input and target for each feature
         squared_deviations = torch.pow(input - target, 2)
-        # Add up over all features
-        error = torch.sum(squared_deviations)
+        # Add up over all features and divide by 
+        error = torch.sum(squared_deviations) / len(squared_deviations)
         # Return the result
         return error
 
