@@ -24,8 +24,8 @@ class ReconstructionLoss(nn.Module):
 
         # Square the difference between input and target for each feature
         squared_deviations = torch.pow(input - target, 2)
-        # Add up over all features and divide by 
-        error = torch.sum(squared_deviations) / len(squared_deviations)
+        # Get the mean (over both batches and features)
+        error = torch.mean(squared_deviations)
         # Return the result
         return error
 
