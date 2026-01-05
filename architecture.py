@@ -19,11 +19,11 @@ class Encoder(nn.Module):
         self.flatten = nn.Flatten()
         # Define the neural network operations
         self.operations = nn.Sequential( # Wrap the sequence of linear layers and activation functions
-            nn.Linear(in_features = num_features, out_features = 128), # num_features -> 32, linear layer
+            nn.Linear(in_features = num_features, out_features = 128), # num_features -> 128, linear layer
             nn.Tanh(), # Hyperbolic tangent activation function
-            nn.Linear(in_features = 128, out_features = 32), # 32 -> 16, linear
+            nn.Linear(in_features = 128, out_features = 32), # 128 -> 32, linear
             nn.Tanh(),
-            nn.Linear(in_features = 32, out_features = latent_dim), # 16 -> latent_dim, linear
+            nn.Linear(in_features = 32, out_features = latent_dim), # 32 -> latent_dim, linear
             nn.Tanh()
         )
 
