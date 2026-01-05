@@ -24,7 +24,7 @@ class ReconstructionLoss(nn.Module):
 
         # Square the difference between input and target for each feature
         squared_deviations = torch.pow(input - target, 2)
-        # Get the mean (over both batches and features)
+        # Get the mean (averaged over the number of features)
         error = torch.mean(squared_deviations)
         # Return the result
         return error
@@ -39,12 +39,15 @@ def training_step(encoder, decoder, train_batches, optimizer, loss_function):
     optimizer (torch.optim): optimizer used to update model weights in backpropagation
     loss_function (torch.nn.Module): loss function comparing features and their autoencoder reconstruction
     Outputs:
-    None (encoder and decoder parameters are adjusted and saved within those objects)
+    avg_loss (float): Average loss over the training batches
     '''
     
     # Set both models to training mode
     encoder.train()
     decoder.train()
+
+    # Set up variable for the total loss
+    total_loss = 0
 
     # Loop through training batches
     for batch, features in enumerate(train_batches):
@@ -57,6 +60,8 @@ def training_step(encoder, decoder, train_batches, optimizer, loss_function):
 
         # Calculate the loss function
         loss = loss_function(abundances, reconstruction)
+        # Add this to the total loss
+        total_loss += loss
 
         # Backpropagation
         loss.backward()
@@ -69,6 +74,13 @@ def training_step(encoder, decoder, train_batches, optimizer, loss_function):
         if batch % 100 == 0:
             print('Loss: %.4f' % loss.item())
 
+    # Get the average loss
+    avg_loss = total_loss / len(train_batches)
+    # Return this
+    return avg_loss
+
+        
+
 # Testing process in each epoch
 def testing_step(encoder, decoder, test_batches, loss_function): 
     '''
@@ -78,7 +90,7 @@ def testing_step(encoder, decoder, test_batches, loss_function):
     test_batches (torch.tensor): tensor containing features for testing data (grouped in batches)
     loss_function (torch.nn.Module): loss function comparing features and their autoencoder reconstruction
     Outputs:
-    None
+    avg_loss (float): Average loss over the test batches
     '''
 
     # Set encoder and decoder to evaluation mode
@@ -109,6 +121,8 @@ def testing_step(encoder, decoder, test_batches, loss_function):
     avg_loss = total_loss / num_batches
     # Print this
     print('Average test loss: %.4f' % avg_loss)
+    # Return the average loss
+    return avg_loss
 
 def training(encoder, decoder, train_batches, test_batches, 
              learning_rate = 1e-3, epochs = 100):
@@ -121,7 +135,8 @@ def training(encoder, decoder, train_batches, test_batches,
     learning_rate (float): scalar multiplying gradient in weight updates
     epochs (int): number of train-test cycles (each uses all train and test batches)
     Outputs:
-    None (encoder and decoder parameters are adjusted and saved within those objects)
+    train_losses (list of floats): List of the average training loss for each epoch
+    test_losses (list of floats): List of the average test loss for each epoch
     '''
 
     # Set up ADAM optimizer to update encoder and decoder parameters
@@ -131,12 +146,21 @@ def training(encoder, decoder, train_batches, test_batches,
     # Set up the loss function as the reconstruction loss defined above
     loss_function = ReconstructionLoss()
 
+    # Set up arrays for the training and test loss 
+    train_losses = []
+    test_losses = []
+
     # Loop through epochs
     for epoch in range(epochs):
         # Print epoch number to track progress
         print('Epoch: %i' % (epoch + 1))
         # Training step
-        training_step(encoder, decoder, train_batches, optimizer, loss_function)
+        train_loss = training_step(encoder, decoder, train_batches, optimizer, loss_function)
+        train_losses.append(train_loss) # Add this to the appropriate array
         # Testing step
-        testing_step(encoder, decoder, test_batches, loss_function)
+        test_loss = testing_step(encoder, decoder, test_batches, loss_function)
+        test_losses.append(test_loss) # Add this to the appropriate array
+
+    # Return the train and test loss arrays
+    return train_losses, test_losses
     print('Done!')
