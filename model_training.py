@@ -30,7 +30,7 @@ class ReconstructionLoss(nn.Module):
         return error
 
 # Training process in each epoch
-def training_step(encoder, decoder, train_batches, optimizer, loss_function):
+def training_step(encoder, decoder, train_batches, optimizer, loss_function, device):
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
@@ -38,6 +38,7 @@ def training_step(encoder, decoder, train_batches, optimizer, loss_function):
     train_batches (torch.tensor): tensor containing features for training data (grouped in batches)
     optimizer (torch.optim): optimizer used to update model weights in backpropagation
     loss_function (torch.nn.Module): loss function comparing features and their autoencoder reconstruction
+    device (str): "cpu" or torch.accelerator.current_accelerator()
     Outputs:
     avg_loss (float): Average loss over the training batches
     '''
@@ -51,8 +52,8 @@ def training_step(encoder, decoder, train_batches, optimizer, loss_function):
 
     # Loop through training batches
     for batch, features in enumerate(train_batches):
-        # Extract the abundances from the features (columns 6+)
-        abundances = features[:, 6:]
+        # Extract the abundances from the features (columns 6+) and pass to the torch device
+        abundances = features[:, 6:].to(device)
         # Apply encoder to abundances get latent space representation
         latents = encoder(abundances)
         # Apply decoder to get reconstruction in feature space
@@ -82,13 +83,14 @@ def training_step(encoder, decoder, train_batches, optimizer, loss_function):
         
 
 # Testing process in each epoch
-def testing_step(encoder, decoder, test_batches, loss_function): 
+def testing_step(encoder, decoder, test_batches, loss_function, device): 
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
     decoder (Decoder): instance of Decoder class defined in architecture.py
     test_batches (torch.tensor): tensor containing features for testing data (grouped in batches)
     loss_function (torch.nn.Module): loss function comparing features and their autoencoder reconstruction
+    device (str): "cpu" or torch.accelerator.current_accelerator()
     Outputs:
     avg_loss (float): Average loss over the test batches
     '''
@@ -106,8 +108,8 @@ def testing_step(encoder, decoder, test_batches, loss_function):
     # WITHOUT calculating gradients
     with torch.no_grad():
         for batch, features in enumerate(test_batches):
-            # Extract the abundances from the input features (columns 6+)
-            abundances = features[:, 6:]
+            # Extract the abundances from the input features (columns 6+) and pass to torch device
+            abundances = features[:, 6:].to(device)
             # Apply encoder to get latent space representation
             latents = encoder(abundances)
             # Apply decoder to get reconstruction in feature space
@@ -124,7 +126,7 @@ def testing_step(encoder, decoder, test_batches, loss_function):
     # Return the average loss
     return avg_loss
 
-def training(encoder, decoder, train_batches, test_batches, 
+def training(encoder, decoder, train_batches, test_batches, device,
              learning_rate = 1e-3, epochs = 100):
     '''
     Inputs:
@@ -132,6 +134,7 @@ def training(encoder, decoder, train_batches, test_batches,
     decoder (Decoder): instance of Decoder class defined in architecture.py
     train_batches (torch.tensor): tensor containing features for training data (grouped in batches)
     test_batches (torch.tensor): tensor containing features for test data (grouped in batches)
+    device (str): "cpu" or torch.accelerator.current_accelerator()
     learning_rate (float): scalar multiplying gradient in weight updates
     epochs (int): number of train-test cycles (each uses all train and test batches)
     Outputs:
@@ -155,10 +158,10 @@ def training(encoder, decoder, train_batches, test_batches,
         # Print epoch number to track progress
         print('Epoch: %i' % (epoch + 1))
         # Training step
-        train_loss = training_step(encoder, decoder, train_batches, optimizer, loss_function)
+        train_loss = training_step(encoder, decoder, train_batches, optimizer, loss_function, device)
         train_losses.append(train_loss) # Add this to the appropriate array
         # Testing step
-        test_loss = testing_step(encoder, decoder, test_batches, loss_function)
+        test_loss = testing_step(encoder, decoder, test_batches, loss_function, device)
         test_losses.append(test_loss) # Add this to the appropriate array
 
     # Return the train and test loss arrays
