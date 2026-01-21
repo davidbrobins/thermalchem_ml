@@ -79,7 +79,7 @@ test_length = len(all_data) - train_length
 
 # Split the scaled data (keeping sample index, time, and sampled parameter columns)
 # Set a random seed
-generator = torch.Generator.manual_seed(33974)
+generator = torch.Generator().manual_seed(2583)
 train_data, test_data = torch.utils.data.random_split(scaled_data, (train_length, test_length), generator = generator)
 
 # Set up the data in batches
@@ -116,6 +116,7 @@ plt.ylabel('Reconstruction loss')
 plt.suptitle('Latent dimension = ' + str(latent_dim)) # Title plot with latent space dimension
 plt.legend() # Legend showing loss type
 plt.savefig('autoencoder_ld_' + str(latent_dim) + '_loss_curve.pdf') # Save the plot
+plt.close()
 
 # Test looking at the latent space evolution for first chempl training run
 first_chempl_run = scaled_data[:462,:] # Get data all 461 time values in first training run
@@ -130,3 +131,8 @@ plt.xscale('log') # Time on a log-scale
 plt.suptitle('Latent features for first chempl training run')
 plt.legend() # Legend
 plt.savefig('autoencoder_ld_' + str(latent_dim) + '_latents.pdf')
+plt.close()
+
+# Save the trained models
+torch.save(encoder.state_dict(), 'encoder_ld_' + str(latent_dim))
+torch.save(decoder.state_dict(), 'decoder_ld_' + str(latent_dim))
