@@ -4,12 +4,14 @@
 import torch
 import numpy as np
 
-# Rescale log(T_gas), log(n_gas), log(G0_UV), log(cell_thickness_pc), and log(abundances) to [-1, 1] interval
-def scale_features(input_tensor, T_gas_min = 1e1, T_gas_max = 1e4, n_gas_min = 1e1, 
-                   n_gas_max = 1e6, G0_UV_min = 1e-2, G0_UV_max = 1e3, min_abundance = 1e-20):
+# Rescale log(delta_t), log(T_gas), log(n_gas), log(G0_UV), log(cell_thickness_pc), and log(abundances) to [-1, 1] interval
+def scale_features(input_tensor, delta_t_min = 10, delta_t_max = 1e8, T_gas_min = 1e1, T_gas_max = 1e4, 
+                   n_gas_min = 1e1, n_gas_max = 1e6, G0_UV_min = 1e-2, G0_UV_max = 1e3, min_abundance = 1e-20):
     ''' 
     Inputs:
     input_tensor (torch.tensor): contains times, chemical abundances, and temperatures from solved chemical network
+    delta_t_min (float): Minimum timestep between selected pairs (in yr), defaults to 10
+    delta_t_max (float): Maximum timestep between selected pairs (in yr), defaults to 1e8
     T_gas_min (float): Minimum temperature (in K) in the sampling scheme, defaults to 10
     T_gas_max (float): Maximum temperature (in K) in the sampling scheme, defaults to 10^4
     n_gas_min (float): Minimum density (in cm^-3) in the sampling scheme, defaults to 10
@@ -33,12 +35,18 @@ def scale_features(input_tensor, T_gas_min = 1e1, T_gas_max = 1e4, n_gas_min = 1
 
 
     # Scale the features
-    # Scale temperature column (index 2)
-    log_T = torch.log10(input_tensor[:, 2]) # Get log(T/K)
+    # Scale time column (index 1)
+    log_delta_t = torch.log10(input_tensor[:, 1]) # Get log(delta_t/yr)
+    # Get min, max log(delta_t)
+    log_delta_t_min = np.log10(delta_t_min)
+    log_delta_t_max = np.log10(delta_t_max)
+    # Linearly rescale to the interval [-1, 1]
+    feature_tensor[:, 1] = -1 + 2 * (log_delta_t - log_delta_t_min) / (log_delta_t_max - log_delta_t_min)
+    # Do the same for temperature (index 2)
+    log_T = torch.log10(input_tensor[:, 2]) 
     # Get min, max temps
     log_T_min = np.log10(T_gas_min)
     log_T_max = np.log10(T_gas_max)
-    # Linearly rescale to the interval [-1, 1]
     feature_tensor[:, 2] = -1 + 2 * (log_T - log_T_min) / (log_T_max - log_T_min)
     # Do the same for density (index 3)
     log_n = torch.log10(input_tensor[:, 3])
@@ -72,3 +80,5 @@ def scale_features(input_tensor, T_gas_min = 1e1, T_gas_max = 1e4, n_gas_min = 1
 
     # Return the tensor containing the features
     return feature_tensor
+
+# TODO: add additional function to unscale time, features, abundances? (might be useful for ReconstructionLoss?)
