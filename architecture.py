@@ -1,8 +1,9 @@
 # Define the forward pass of the neural networks making up the emulator
 
 # Import statements
-import torch
-from torch import nn
+import torch # pytorch for neural networks
+from torch import nn # Specifically import neural network module
+import deepxde as dde # DeepXDE for DeepONet architecture used in time emulator
 
 # Define the encoder class (inherits from nn.Module)
 class Encoder(nn.Module):
@@ -55,3 +56,35 @@ class Decoder(nn.Module):
         latents = self.flatten(latents)
         outputs = self.operations(latents)
         return outputs
+    
+# Define the DeepONet time emulator
+def TimeEmulator(latent_dim, hidden_layer_width, num_hidden_layers):
+    '''
+    Function to define the DeepONet time emulator
+    Inputs:
+    latent_dim (int): Number of latent dimensions from the autoencoder
+    hidden_layer_width (int): Number of nodes per hidden layer in the DeepONet branch/trunk networks
+    num_hidden_layers (int): Number of hidden layers in the DeepOnet branch/trunk networks
+    Outputs:
+    deeponet_model (nn.Module): The DeepONet neural network with the specified architecture
+    '''
+
+    # Network shape parameters
+    branch_inputs = latent_dim + 4 # Branch network takes in autoencoder latent features + 4 sampled physical parameters
+    trunk_inputs = 1 # Trunk network takes in delta_t
+    num_outputs = latent_dim # DeepONet outputs latent features (evolved over timestep delta_t)
+    # Define network shape with needed inputs, outputs, hidden layer number of width from function inputs
+    branch_shape = [branch_inputs] + num_hidden_layers * [hidden_layer_width] + [num_outputs]
+    # use DeepONet mode where trunk output is split for each total network output
+    # so need (num_output ^ 2) nodes in final layer of trunk network
+    trunk_shape = [trunk_inputs] + num_hidden_layers * [hidden_layer_width] * [num_outputs ** 2]
+
+    # Configure DeepONet
+    deeponet_model = dde.nn.pytorch.deeponet.DeepONet(layer_sizes_branch = branch_shape, # Branch network shape defined above
+                                                      layer_sizes_trunk = trunk_shape, # Trunk network shape defined above
+                                                      activation = 'Tanh', # Features all in [-1, 1] interval
+                                                      kernel_initializer = 'Glorot normal',
+                                                      num_outputs = num_outputs, # Define number of outputs
+                                                      multi_output_strategy = 'split_trunk' # Split trunk network for each output
+    )
+    return deeponet_model
