@@ -81,4 +81,27 @@ def scale_features(input_tensor, delta_t_min = 10, delta_t_max = 1e8, T_gas_min 
     # Return the tensor containing the features
     return feature_tensor
 
-# TODO: add additional function to unscale time, features, abundances? (might be useful for ReconstructionLoss?)
+# Define class to hold "triplet" time-pair data that will be used as model inputs
+class AbunAfterDt(torch.utils.data.DataSet): # Based on pytorch DataSet framework
+    '''Dataset containing abundances at beginning and end of timestep dt'''
+
+    def __init__(self, initial, dt, final):
+        '''
+        Inputs:
+        initial (N * (num_abundances + 4) tensor): Tensor containing initial abundances + 4 physical parameters
+        dt (N * 1 tensor): Tensor containing timesteps dt
+        final (N * num_abundances tensor): Tensor containing final abundances
+        '''
+
+        # Assign initial, dt, and final to self as properties we can use later
+        self.initial = initial
+        self.dt = dt
+        self.final = final
+
+    def __len__(self):
+        return len(self.final) # Length is length of final tensor (i.e. its first dimension)
+    
+    def __getitem__(self, idx):
+        # Return the sample as a tuple with initial, dt grouped together (the 'features')
+        # i.e. ((initial, dt), final)
+        return (self.initial[idx], self.dt[idx]), self.final[idx]
