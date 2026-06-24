@@ -1,11 +1,12 @@
-# Script to train the autoencoder
-# Usage: python train_autoencoder.py samples_dir/ latent_dim 
+# Script to train the full emulator pipeline
+# Usage: python train_pipeline.py samples_dir/ latent_dim hidden_layer_width num_hidden_layers substeps
 
 # Import statements
 import sys # Command line arguments
 import pandas as pd # Pandas for dataframe handling
 import numpy as np # Numpy for math
 import torch # Torch for ML
+import itertools # Iteration tools
 import matplotlib.pyplot as plt # Plotting
 # Use ML pipeline set up here
 import architecture # ML model architecture
@@ -13,10 +14,14 @@ import model_training # Training steps
 import preprocessing # Feature scaling
 
 # Unpack command line arguments
-# Name of this file, path location of data, number of latent space dimensions
-(pyfilename, samples_dir, latent_dim) = sys.argv 
-# Convert latent_dim to integer
+# Name of this file, path location of data, model properties
+(pyfilename, samples_dir, num_runs, latent_dim, hidden_layer_width, num_hidden_layers, substeps) = sys.argv 
+# Convert the model properties to integers
+num_runs = int(num_runs)
 latent_dim = int(latent_dim)
+hidden_layer_width = int(hidden_layer_width)
+num_hidden_layers = int(num_hidden_layers)
+substeps = int(substeps)
 
 # Torch set up
 # Check if GPU is available (use CPU if not)
@@ -27,11 +32,11 @@ torch.set_num_threads(8)
 # Print the number of CPUs seen by torch to confirm
 print('CPUs to be used by torch:', torch.get_num_threads())
 
-# Read in the training
+# Read in the chemical network data
 # Create a list to hold all the dataframes
 dfs_list = []
-# Loop through 1024 training samples
-for index in range(1024):
+# Loop through chemical network samples
+for index in range(num_runs):
     # Read in the results file as a pandas dataframe
     chempl_results = pd.read_csv(samples_dir + str(index).zfill(6) + '/results.dat',
                                  sep = r'\s+')
@@ -47,8 +52,6 @@ for index in range(1024):
     dfs_list.append(chempl_results)
 # Concatenate all the datafames
 all_data = pd.concat(dfs_list)
-
-# Prepare the data for input to the autoencoder
 # Look at where the data is under some threshold
 min_abundance = 1e-20
 # Only keep abundance columns with some values above this threshold
@@ -64,11 +67,59 @@ filtered_data.insert(loc = 2, column = 'T_gas', value = all_data['T_gas'])
 filtered_data.insert(loc = 3, column = 'n_gas', value = all_data['n_gas'])
 filtered_data.insert(loc = 4, column = 'G0_UV', value = all_data['G0_UV'])
 filtered_data.insert(loc = 5, column = 'cell_thickness_pc', value = all_data['cell_thickness_pc'])
-# Convert this dataframe to a torch tensor (with dtype = torch.float32 to be consistent with network weights)
-data_tensor = torch.from_numpy(filtered_data.values).to(dtype = torch.float32)
-# Rescale the log-abundance values using the function defined in the "preprocessing" module
-scaled_data = preprocessing.scale_features(data_tensor)
 
+# Separate pairs of time points with same parameters into "initial" and "final" datasets
+# Create a list to hold all the dataframes
+initial_dfs_list = []
+final_dfs_list = []
+# Define parameters for selecting time-pairs 
+min_delta_t = 10 # Minimum delta_t value, in years (yr)
+num_pairs_per_run = 1000 # Number of pairs per run
+# Loop through chempl runs
+for sample_index in range(num_runs): 
+    # Get (filtered) data just for that run
+    filtered_run = filtered_data.loc[filtered_data['sample_num'] == sample_index]
+    # Get all pairs of indices (with earlier time first)
+    index_pairs = np.array(list(itertools.combinations(filtered_run.index, 2)))
+    # Get first and second elements of each pair
+    first_index = index_pairs[:, 0]
+    second_index = index_pairs[:, 1]
+    # Get delta_t (in years) for each pair (neeed to reset indices to allow subtraction)
+    delta_t_vals = filtered_run['Time'].iloc[second_index].reset_index(drop = True) - filtered_run['Time'].iloc[first_index].reset_index(drop = True)
+    # Get indices for pairs where delta_t is above the minimum threshold defined above
+    restricted_index = delta_t_vals.loc[delta_t_vals > min_delta_t].index
+    # Choose num_pairs_per_run random indices where delta_t is above min_delta_t (without replacement to avoid duplicate pairs)
+    random_index = np.random.choice(restricted_index, size = num_pairs_per_run, replace = False)
+    # Now restrict pair indices to pairs with delta_t above minimum threshold
+    first_index = first_index[random_index]
+    second_index = second_index[random_index]
+    # Generate dataframes with the rows at these indices
+    initial_data = filtered_run.iloc[first_index]
+    final_data = filtered_run.iloc[second_index]
+    # Reset indices to default so can subtract
+    initial_data = initial_data.reset_index(drop = True)
+    final_data = final_data.reset_index(drop = True)
+    # Get time difference
+    delta_t = final_data['Time'] - initial_data['Time']
+    # Put this as the time column in both dataframes
+    initial_data['Time'] = delta_t
+    final_data['Time'] = delta_t
+    # Append each dataframe to the appropriate list
+    initial_dfs_list.append(initial_data)
+    final_dfs_list.append(final_data)
+# Combine the dataframes in each list
+all_initial_data = pd.concat(initial_dfs_list)
+all_final_data = pd.concat(final_dfs_list)
+# Convert these dataframes to torch tensors
+initial_tensor = torch.from_numpy(all_initial_data.values).to(dtype = torch.float32)
+final_tensor = torch.from_numpy(all_final_data.values).to(dtype = torch.float32)
+# Scale them to the interval [-1, 1] using the function from preprocessing.py
+scaled_initial = preprocessing.scale_features(initial_tensor)
+scaled_final = preprocessing.scale_features(final_tensor)
+
+
+
+'''
 # Do a train-test split
 # Set the fraction of data to use for model training
 train_frac = 0.7
@@ -132,7 +183,4 @@ plt.suptitle('Latent features for first chempl training run')
 plt.legend() # Legend
 plt.savefig('autoencoder_ld_' + str(latent_dim) + '_latents.pdf')
 plt.close()
-
-# Save the trained models
-torch.save(encoder.state_dict(), 'encoder_ld_' + str(latent_dim))
-torch.save(decoder.state_dict(), 'decoder_ld_' + str(latent_dim))
+'''
