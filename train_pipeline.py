@@ -117,9 +117,14 @@ final_tensor = torch.from_numpy(all_final_data.values).to(dtype = torch.float32)
 scaled_initial = preprocessing.scale_features(initial_tensor)
 scaled_final = preprocessing.scale_features(final_tensor)
 
+# Package data in the AbunAfterDt class defined in preprocessing.py
+# Get needed tensors
+initial_features = scaled_initial[:, 2:] # Keep physical parameters @ indices 2-5, abundances @ indices 6+
+delta_t = scaled_final[:, 1].unsqueeze(dim = 1) # Just time column @ index 1
+final_features = scaled_final[:, 6:] # Keep abundances @ indices 6+ 
+# Put these into the AbunAfterDt class
+all_data = preprocessing.AbunAfterDt(initial_features, delta_t, final_features)
 
-
-'''
 # Do a train-test split
 # Set the fraction of data to use for model training
 train_frac = 0.7
@@ -127,60 +132,49 @@ train_frac = 0.7
 train_length = int(train_frac * len(all_data))
 # Use the rest of the data for test set
 test_length = len(all_data) - train_length
-
-# Split the scaled data (keeping sample index, time, and sampled parameter columns)
-# Set a random seed
-generator = torch.Generator().manual_seed(2583)
-train_data, test_data = torch.utils.data.random_split(scaled_data, (train_length, test_length), generator = generator)
+# Split the data 
+# Set up a generator
+generator = torch.Generator(device = device)
+train_class, test_class = torch.utils.data.random_split(all_data, (train_length, test_length), generator = generator)
 
 # Set up the data in batches
-dataloader_train = torch.utils.data.DataLoader(train_data, batch_size = 64, shuffle = True)
-dataloader_test = torch.utils.data.DataLoader(test_data, batch_size = 64, shuffle = True)
+dataloader_train = torch.utils.data.DataLoader(train_class, batch_size = 64, shuffle = True, generator = generator)
+dataloader_test = torch.utils.data.DataLoader(test_class, batch_size = 64, shuffle = True, generator = generator)
 
 # Set up the models
 # Determine the number of abundance features by removing the non-abundance columns (sample index, time, 4 sampled parameters)
-num_feat = len(scaled_data[0,:]) - 6
+num_feat = len(initial_tensor[0,:]) - 6
+print(num_feat) # Just to check
 # Create encoder and decoder instances with the appropriate dimensions and pass to the torch device
 encoder = architecture.Encoder(num_features = num_feat, latent_dim = latent_dim).to(device)
 decoder = architecture.Decoder(num_features = num_feat, latent_dim = latent_dim).to(device)
-
+# Create time emulator
+time_emulator = architecture.TimeEmulator(latent_dim = latent_dim, hidden_layer_width = hidden_layer_width, 
+                                          num_hidden_layers = num_hidden_layers).to(device)
+torch.autograd.set_detect_anomaly(True) # To detect anomalies
 # Train the model using function from "model_training" module
 train_losses, test_losses = model_training.training(encoder = encoder, decoder = decoder, 
+                                                    time_emulator = time_emulator,
                                                     train_batches = dataloader_train, 
                                                     test_batches = dataloader_test, 
-                                                    device = device, 
-                                                    learning_rate = 0.003, epochs = 100) # Parameters
+                                                    device = device, substeps = substeps, 
+                                                    learning_rate = 0.03, epochs = 10) # Parameters
 
 # Extract value of the train and test loss at each epoch
 tr_loss = [x.item() for x in train_losses]
 te_loss = [x.item() for x in test_losses]
 # Save the values
-np.savez('autoencoder_ld_' + str(latent_dim) + '_losses.npz', tr_loss, te_loss)
+print('Training loss: ', tr_loss)
+print('Test loss: ', te_loss)
 
 # Plot the loss curve
-epochs = np.arange(1, 101)
+epochs = np.arange(1, 11)
 plt.plot(epochs, tr_loss, label = 'Training loss') # Plot training and test loss (vs epoch number)
 plt.plot(epochs, te_loss, label = 'Test loss')
 plt.yscale('log') # Loss function on a log-scale
 plt.xlabel('Epoch') # Label axes
 plt.ylabel('Reconstruction loss')
-plt.suptitle('Latent dimension = ' + str(latent_dim)) # Title plot with latent space dimension
+#plt.suptitle('Latent dimension = ' + str(latent_dim)) # Title plot with latent space dimension
 plt.legend() # Legend showing loss type
-plt.savefig('autoencoder_ld_' + str(latent_dim) + '_loss_curve.pdf') # Save the plot
+plt.savefig('test_full_pipeline_loss_curve.pdf') # Save the plot
 plt.close()
-
-# Test looking at the latent space evolution for first chempl training run
-first_chempl_run = scaled_data[:462,:] # Get data all 461 time values in first training run
-times = first_chempl_run[:, 1].numpy() # Get the times
-first_latents = encoder(first_chempl_run[:, 6:].to(device)) # Pass the abundances to the encoder
-for i in range(latent_dim): # Loop through features
-    # Plot latent space values vs. time for each feature
-    plt.plot(times, first_latents[:, i].detach().cpu().numpy(), label = 'Latent feature ' + str(i))
-plt.xlabel('Time [yr]') # Label axes
-plt.ylabel('Latent feature value')
-plt.xscale('log') # Time on a log-scale
-plt.suptitle('Latent features for first chempl training run')
-plt.legend() # Legend
-plt.savefig('autoencoder_ld_' + str(latent_dim) + '_latents.pdf')
-plt.close()
-'''

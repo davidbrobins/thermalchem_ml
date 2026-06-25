@@ -82,7 +82,7 @@ def scale_features(input_tensor, delta_t_min = 10, delta_t_max = 1e8, T_gas_min 
     return feature_tensor
 
 # Define class to hold "triplet" time-pair data that will be used as model inputs
-class AbunAfterDt(torch.utils.data.DataSet): # Based on pytorch DataSet framework
+class AbunAfterDt(torch.utils.data.Dataset): # Based on pytorch DataSet framework
     '''Dataset containing abundances at beginning and end of timestep dt'''
 
     def __init__(self, initial, dt, final):

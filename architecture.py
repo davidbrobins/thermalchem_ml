@@ -77,7 +77,7 @@ def TimeEmulator(latent_dim, hidden_layer_width, num_hidden_layers):
     branch_shape = [branch_inputs] + num_hidden_layers * [hidden_layer_width] + [num_outputs]
     # use DeepONet mode where trunk output is split for each total network output
     # so need (num_output ^ 2) nodes in final layer of trunk network
-    trunk_shape = [trunk_inputs] + num_hidden_layers * [hidden_layer_width] * [num_outputs ** 2]
+    trunk_shape = [trunk_inputs] + num_hidden_layers * [hidden_layer_width] + [num_outputs ** 2]
 
     # Configure DeepONet
     deeponet_model = dde.nn.pytorch.deeponet.DeepONet(layer_sizes_branch = branch_shape, # Branch network shape defined above

@@ -30,9 +30,10 @@ class ReconstructionLoss(nn.Module):
         input_abuns = (min_log_y / 2) - ((min_log_y / 2)  * input) # Unscale inputs
         target_abuns = (min_log_y / 2) - ((min_log_y / 2) * target)
 
-
-        # Square the difference between input and target for each feature
-        squared_deviations = torch.pow(input_abuns - target_abuns, 2)
+        # Set a small threshold to avoid 0 losses
+        epsilon = 1e-8
+        # Square the difference between input and target for each feature (adding threshold to avoid nans in backwards pass)
+        squared_deviations = torch.pow(input_abuns - target_abuns + epsilon, 2)
         # Get the mean (averaged over the number of features)
         error = torch.mean(squared_deviations)
         # Return the result
@@ -101,13 +102,22 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         initial_abundances = initial[:, 4:].to(device)
         # Apply encoder to abundances get latent space representation
         initial_latents = encoder(initial_abundances)
+        # TODO: Redefine initial_for_te by concatenating slices
+        '''
+        # Initialize tensor to pass to time_emulator [batch_size * (latent_dim + 4)]
+        initial_for_te = torch.zeros(len(dt), len(initial_latents[0]) + 4, requires_grad = True)
+        # First 4 columns are the physical paramaters from initial
+        initial_for_te[:, :4] = initial[:, :4].clone()
+        # Remaining columns are the encoded abundances
+        initial_for_te[:, 4:] = initial_latents.clone()
+        '''
         # Apply time emulator iteratively to evolve latents
-        evolved_latents = iterate_time_emulator(time_emulator, initial_latents, dt.to(device), substeps = substeps)
+        evolved_latents = iterate_time_emulator(time_emulator, initial_for_te.to(device), dt.to(device), substeps = substeps)
         # Apply decoder to get predict evolved abundances
         pred = decoder(evolved_latents)
 
         # Calculate the loss function
-        loss = loss_function(target, pred)
+        loss = loss_function(target.to(device), pred)
         # Add this to the total loss
         total_loss += loss
 
@@ -165,8 +175,14 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
             initial_abundances = initial[:, 4:].to(device)
             # Apply encoder to get latent space representation
             initial_latents = encoder(initial_abundances)
+            # Initialize tensor to pass to time_emulator [batch_size * (latent_dim + 4)]
+            initial_for_te = torch.zeros(len(dt), len(initial_latents[0]) + 4)
+            # First 4 columns are the physical paramaters from initial
+            initial_for_te[:, :4] = initial[:, :4]
+            # Remaining columns are the encoded abundances
+            initial_for_te[:, 4:] = initial_latents
             # Iterate time emulator to evolve latent space features
-            evolved_latents = iterate_time_emulator(time_emulator, initial_latents, dt.to(device), substeps = substeps)
+            evolved_latents = iterate_time_emulator(time_emulator, initial_for_te.to(device), dt.to(device), substeps = substeps)
             # Apply decoder to get predicted evolved abundances
             pred = decoder(evolved_latents)
             # Calculate loss in this batch
