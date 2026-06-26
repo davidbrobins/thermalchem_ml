@@ -15,13 +15,12 @@ import preprocessing # Feature scaling
 
 # Unpack command line arguments
 # Name of this file, path location of data, model properties
-(pyfilename, samples_dir, num_runs, latent_dim, hidden_layer_width, num_hidden_layers, substeps) = sys.argv 
+(pyfilename, samples_dir, num_runs, latent_dim, hidden_layer_width, num_hidden_layers) = sys.argv 
 # Convert the model properties to integers
 num_runs = int(num_runs)
 latent_dim = int(latent_dim)
 hidden_layer_width = int(hidden_layer_width)
 num_hidden_layers = int(num_hidden_layers)
-substeps = int(substeps)
 
 # Torch set up
 # Check if GPU is available (use CPU if not)
@@ -157,8 +156,8 @@ train_losses, test_losses = model_training.training(encoder = encoder, decoder =
                                                     time_emulator = time_emulator,
                                                     train_batches = dataloader_train, 
                                                     test_batches = dataloader_test, 
-                                                    device = device, substeps = substeps, 
-                                                    learning_rate = 0.03, epochs = 10) # Parameters
+                                                    device = device, learning_rate = 0.01, 
+                                                    epochs = 10) # Parameters
 
 # Extract value of the train and test loss at each epoch
 tr_loss = [x.item() for x in train_losses]

@@ -35,14 +35,7 @@ def scale_features(input_tensor, delta_t_min = 10, delta_t_max = 1e8, T_gas_min 
 
 
     # Scale the features
-    # Scale time column (index 1)
-    log_delta_t = torch.log10(input_tensor[:, 1]) # Get log(delta_t/yr)
-    # Get min, max log(delta_t)
-    log_delta_t_min = np.log10(delta_t_min)
-    log_delta_t_max = np.log10(delta_t_max)
-    # Linearly rescale to the interval [-1, 1]
-    feature_tensor[:, 1] = -1 + 2 * (log_delta_t - log_delta_t_min) / (log_delta_t_max - log_delta_t_min)
-    # Do the same for temperature (index 2)
+    # Scale the temperature (index 2)
     log_T = torch.log10(input_tensor[:, 2]) 
     # Get min, max temps
     log_T_min = np.log10(T_gas_min)

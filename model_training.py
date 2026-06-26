@@ -40,35 +40,34 @@ class ReconstructionLoss(nn.Module):
         return error
     
 # Define function to iterate TimeEmulator (see architecture) over substeps
-def iterate_time_emulator(time_emulator, initial_latents, dt, substeps = 2):
+def iterate_time_emulator_twice(time_emulator, initial_latents, dt):
     '''
-    Predict final encoded abundances using the model, iterated through substeps
+    Predict final encoded abundances using the model, iterated through 2 substeps
     Inputs: 
     time_emulator (DeepONet): instance of TimeEmulator function from architecture.py
-    initial_latents (torch.tensor): (1 * (latent_dim + 4)) tensor containing initial encoded abundances and physical parameters
-    dt (float): timestep 
-    substeps (int): Number of substeps to iterate over, defaults to 2
+    initial_latents (torch.tensor): (N * (latent_dim + 4)) tensor containing initial encoded abundances and physical parameters
+    dt (torch.tensor): (N * 1) tensor containing timestep values
     Outputs:
-    evolved_latents (torch.tensor): (1 * latent_dim) tensor containing evolved encoded abudnances
+    evolved_latents (torch.tensor): (N * latent_dim) tensor containing evolved encoded abundances
     '''
 
     # Get time ratio for calculating the length of each substep
-    ratio = dt ** (1 / substeps) 
-    last_step = 0 # Counter to hold length of last step
-    last_input = initial_latents # Variable holding the latest abundance + feature values
-    # Loop through substeps
-    for step in range(substeps):
-        # Get length of substep
-        step_length = (ratio ** (step + 1)) - last_step # Apply ratio (N + 1) times since N starts at 0 and substract previous position in [0, dt]
-        last_step += step_length # Iterate the last_step variable forward by the length of the current step
-        # Apply the model with initial abundances + features, timestep
-        evolved_latents = time_emulator((last_input, step_length)) 
-        last_input[:, 4:] = evolved_latents # Iterate the abundance values for input to the next step
-
-    return evolved_latents # Return last predicted abundance value
+    ratio = torch.pow(dt, 0.5)
+    # Length of step 1 is just the ratio
+    step_1_length = ratio
+    # Length of step 2 is dt minus step 1
+    step_2_length = dt - step_1_length
+    # Apply the model once
+    evolved_latents_1 = time_emulator((initial_latents, step_1_length))
+    # Update the abundance values
+    evolved_input = initial_latents.clone()
+    evolved_input[:, 4:] = evolved_latents_1
+    # Apply the model again
+    evolved_latents_2 = time_emulator((evolved_input, step_2_length))
+    return evolved_latents_2 # Return last predicted abundance value
 
 # Training process in each epoch
-def training_step(encoder, decoder, time_emulator, train_batches, optimizer, loss_function, device, substeps = 2):
+def training_step(encoder, decoder, time_emulator, train_batches, optimizer, loss_function, device):
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
@@ -78,7 +77,6 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
     optimizer (torch.optim): optimizer used to update model weights in backpropagation
     loss_function (torch.nn.Module): loss function comparing features and their autoencoder reconstruction
     device (str): "cpu" or torch.accelerator.current_accelerator()
-    substeps (int): number of substeps for iteratively applying time_emulator (defaults to 2)
     Outputs:
     avg_loss (float): Average loss over the training batches
     '''
@@ -98,11 +96,14 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         dt = features[0][1]
         target = features[1]
 
+        # Extract the physical parameters (columns 0-3) and pass to the torch device
+        physical_params = initial[:, :4].to(device)
         # Extract the abundances from the features (columns 4+) and pass to the torch device
         initial_abundances = initial[:, 4:].to(device)
         # Apply encoder to abundances get latent space representation
         initial_latents = encoder(initial_abundances)
-        # TODO: Redefine initial_for_te by concatenating slices
+        # Concatenate physical parameters (physical_params) and encoded abundances (initial latents)
+        initial_for_te = torch.cat((physical_params, initial_latents), dim = 1)
         '''
         # Initialize tensor to pass to time_emulator [batch_size * (latent_dim + 4)]
         initial_for_te = torch.zeros(len(dt), len(initial_latents[0]) + 4, requires_grad = True)
@@ -112,7 +113,7 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         initial_for_te[:, 4:] = initial_latents.clone()
         '''
         # Apply time emulator iteratively to evolve latents
-        evolved_latents = iterate_time_emulator(time_emulator, initial_for_te.to(device), dt.to(device), substeps = substeps)
+        evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt.to(device))
         # Apply decoder to get predict evolved abundances
         pred = decoder(evolved_latents)
 
@@ -140,7 +141,7 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         
 
 # Testing process in each epoch
-def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, device, substeps = 2): 
+def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, device): 
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
@@ -149,7 +150,6 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
     test_batches (torch.tensor): tensor containing features for testing data (grouped in batches)
     loss_function (torch.nn.Module): loss function comparing features and their autoencoder reconstruction
     device (str): "cpu" or torch.accelerator.current_accelerator()
-    substeps (int): number of substeps for iteratively applying time_emulator (defaults to 2)
     Outputs:
     avg_loss (float): Average loss over the test batches
     '''
@@ -171,22 +171,28 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
             dt = features[0][1]
             target = features[1]            
 
+            # Extract the physical parameters (columns 0-3) and pass to the torch device
+            physical_params = initial[:, :4].to(device)
             # Extract the abundances from the input features (columns 6+) and pass to torch device
             initial_abundances = initial[:, 4:].to(device)
             # Apply encoder to get latent space representation
             initial_latents = encoder(initial_abundances)
+            # Concatenate physical parameters (physical_params) and encoded abundances (initial latents)
+            initial_for_te = torch.cat((physical_params, initial_latents), dim = 1)
+            '''
             # Initialize tensor to pass to time_emulator [batch_size * (latent_dim + 4)]
             initial_for_te = torch.zeros(len(dt), len(initial_latents[0]) + 4)
             # First 4 columns are the physical paramaters from initial
             initial_for_te[:, :4] = initial[:, :4]
             # Remaining columns are the encoded abundances
             initial_for_te[:, 4:] = initial_latents
+            '''
             # Iterate time emulator to evolve latent space features
-            evolved_latents = iterate_time_emulator(time_emulator, initial_for_te.to(device), dt.to(device), substeps = substeps)
+            evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt.to(device))
             # Apply decoder to get predicted evolved abundances
             pred = decoder(evolved_latents)
             # Calculate loss in this batch
-            batch_loss = loss_function(target, pred)
+            batch_loss = loss_function(target.to(device), pred)
             # Add this to the total loss
             total_loss += batch_loss
 
@@ -199,7 +205,7 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
 
 # Define entire training procedure
 def training(encoder, decoder, time_emulator, train_batches, test_batches, device,
-             substeps = 2, learning_rate = 1e-3, epochs = 100):
+             learning_rate = 1e-3, epochs = 100):
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
@@ -208,7 +214,6 @@ def training(encoder, decoder, time_emulator, train_batches, test_batches, devic
     train_batches (torch.tensor): tensor containing features for training data (grouped in batches)
     test_batches (torch.tensor): tensor containing features for test data (grouped in batches)
     device (str): "cpu" or torch.accelerator.current_accelerator()
-    substeps (int): number of substeps for iteratively applying time_emulator (defaults to 2)
     learning_rate (float): scalar multiplying gradient in weight updates
     epochs (int): number of train-test cycles (each uses all train and test batches)
     Outputs:
@@ -232,10 +237,10 @@ def training(encoder, decoder, time_emulator, train_batches, test_batches, devic
         # Print epoch number to track progress
         print('Epoch: %i' % (epoch + 1))
         # Training step
-        train_loss = training_step(encoder, decoder, time_emulator, train_batches, optimizer, loss_function, device, substeps = substeps)
+        train_loss = training_step(encoder, decoder, time_emulator, train_batches, optimizer, loss_function, device)
         train_losses.append(train_loss) # Add this to the appropriate array
         # Testing step
-        test_loss = testing_step(encoder, decoder, time_emulator, test_batches, loss_function, device, substeps = substeps)
+        test_loss = testing_step(encoder, decoder, time_emulator, test_batches, loss_function, device)
         test_losses.append(test_loss) # Add this to the appropriate array
 
     # Return the train and test loss arrays
