@@ -26,8 +26,8 @@ num_hidden_layers = int(num_hidden_layers)
 # Check if GPU is available (use CPU if not)
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
 print(f"Using {device} device") # Print device being used
-# Set number of threads used to 8
-torch.set_num_threads(8)
+# Set number of threads used to 16
+torch.set_num_threads(16)
 # Print the number of CPUs seen by torch to confirm
 print('CPUs to be used by torch:', torch.get_num_threads())
 
@@ -157,7 +157,7 @@ train_losses, test_losses = model_training.training(encoder = encoder, decoder =
                                                     train_batches = dataloader_train, 
                                                     test_batches = dataloader_test, 
                                                     device = device, learning_rate = 0.01, 
-                                                    epochs = 10) # Parameters
+                                                    epochs = 100) # Parameters
 
 # Extract value of the train and test loss at each epoch
 tr_loss = [x.item() for x in train_losses]
