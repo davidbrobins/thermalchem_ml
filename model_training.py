@@ -41,12 +41,13 @@ class ReconstructionLoss(nn.Module):
         return error
     
 # Define function to iterate TimeEmulator (see architecture) over substeps
-def iterate_time_emulator_twice(time_emulator, initial_latents, dt, dt_min = 1e1, dt_max = 1e8):
+def iterate_time_emulator_twice(time_emulator, initial_latents, dt, device, dt_min = 1e1, dt_max = 1e8):
     '''
     Predict final encoded abundances using the model, iterated through 2 substeps
     Inputs: 
     time_emulator (DeepONet): instance of TimeEmulator function from architecture.py
     initial_latents (torch.tensor): (N * (latent_dim + 4)) tensor containing initial encoded abundances and physical parameters
+    device (str): "cpu" or torch.accelerator.current_accelerator()
     dt (torch.tensor): (N * 1) tensor containing timestep values
     dt_min (float): minimum timestep in years (defaults to 10)
     dt_max (float): maximum timestep in years (defaults to 1e8)
@@ -58,19 +59,19 @@ def iterate_time_emulator_twice(time_emulator, initial_latents, dt, dt_min = 1e1
     ratio = torch.pow(dt, 0.5)
     # Length of step 1 is just the ratio
     step_1_length = ratio
-    # Rescale step 1
-    scaled_step_1 = preprocessing.scale_dt(step_1_length, dt_min = dt_min, dt_max = dt_max)
+    # Rescale step 1 (need to put it on cpu first)
+    scaled_step_1 = preprocessing.scale_dt(step_1_length, dt_min = dt_min, dt_max = dt_max).to(device)
     # Length of step 2 is dt minus step 1
     step_2_length = dt - step_1_length
-    # Rescale step 2
-    scaled_step_2 = preprocessing.scale_dt(step_2_length, dt_min = dt_min, dt_max = dt_max)
+    # Rescale step 2 (need to put it on cpu first)
+    scaled_step_2 = preprocessing.scale_dt(step_2_length, dt_min = dt_min, dt_max = dt_max).to(device)
     # Apply the model once
-    evolved_latents_1 = time_emulator((initial_latents, step_1_length))
+    evolved_latents_1 = time_emulator((initial_latents, scaled_step_1))
     # Update the abundance values
     evolved_input = initial_latents.clone()
     evolved_input[:, 4:] = evolved_latents_1
     # Apply the model again
-    evolved_latents_2 = time_emulator((evolved_input, step_2_length))
+    evolved_latents_2 = time_emulator((evolved_input, scaled_step_2))
     return evolved_latents_2 # Return last predicted abundance value
 
 # Training process in each epoch
@@ -122,7 +123,7 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         initial_for_te[:, 4:] = initial_latents.clone()
         '''
         # Apply time emulator iteratively to evolve latents
-        evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt.to(device), dt_min = dt_min, dt_max = dt_max)
+        evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
         # Apply decoder to get predict evolved abundances
         pred = decoder(evolved_latents)
 
@@ -199,7 +200,7 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
             initial_for_te[:, 4:] = initial_latents
             '''
             # Iterate time emulator to evolve latent space features
-            evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt.to(device), dt_min = dt_min, dt_max = dt_max)
+            evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
             # Apply decoder to get predicted evolved abundances
             pred = decoder(evolved_latents)
             # Calculate loss in this batch
