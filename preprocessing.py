@@ -74,6 +74,29 @@ def scale_features(input_tensor, delta_t_min = 10, delta_t_max = 1e8, T_gas_min 
     # Return the tensor containing the features
     return feature_tensor
 
+# Define a function to scale dt tensor (done in training loop as need physical dt value to calculate substeps)
+def scale_dt(dt_tensor, dt_min = 1e1, dt_max = 1e8):
+    '''
+    Function to linearly rescale the time interval log(dt) (in units of years) to the interval [-1, 1]
+    Inputs:
+    dt_tensor (torch.tensor): (N * 1) tensor containing timestep values dt (in years)
+    dt_min (float): minimum timestep value, in years (defaults to 10)
+    dt_max (float): maximum timestep value, in years (defaults to 1e8)
+    Outputs:
+    scaled_dt (torch.tensor): tensor of same shape as dt (N * 1) containing rescaled dt values
+    '''
+
+    # Take log (base 10) of timestep (in years)
+    log_dt = np.log10(dt_tensor)
+    # Get log of min and max dt values
+    log_dt_min = np.log10(dt_min)
+    log_dt_max = np.log10(dt_max)
+    # Linearly rescale to interval [-1, 1]
+    scaled_dt = -1 + 2 * (log_dt - log_dt_min) / (log_dt_max - log_dt_min)
+    # Return the result
+    return scaled_dt
+
+
 # Define class to hold "triplet" time-pair data that will be used as model inputs
 class AbunAfterDt(torch.utils.data.Dataset): # Based on pytorch DataSet framework
     '''Dataset containing abundances at beginning and end of timestep dt'''

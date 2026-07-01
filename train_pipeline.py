@@ -10,7 +10,7 @@ import itertools # Iteration tools
 import matplotlib.pyplot as plt # Plotting
 # Use ML pipeline set up here
 import architecture # ML model architecture
-import model_training # Training steps
+import model_training # Training
 import preprocessing # Feature scaling
 
 # Unpack command line arguments
@@ -36,6 +36,7 @@ print('CPUs to be used by torch:', torch.get_num_threads())
 dfs_list = []
 # Loop through chemical network samples
 for index in range(num_runs):
+    print('Initial data loading index: ', index)
     # Read in the results file as a pandas dataframe
     chempl_results = pd.read_csv(samples_dir + str(index).zfill(6) + '/results.dat',
                                  sep = r'\s+')
@@ -73,9 +74,10 @@ initial_dfs_list = []
 final_dfs_list = []
 # Define parameters for selecting time-pairs 
 min_delta_t = 10 # Minimum delta_t value, in years (yr)
-num_pairs_per_run = 1000 # Number of pairs per run
+num_pairs_per_run = 500 # Number of pairs per run # NOTE: reduced to avoid memory issues
 # Loop through chempl runs
 for sample_index in range(num_runs): 
+    print('Pair loop number: ', sample_index)
     # Get (filtered) data just for that run
     filtered_run = filtered_data.loc[filtered_data['sample_num'] == sample_index]
     # Get all pairs of indices (with earlier time first)
@@ -137,8 +139,8 @@ generator = torch.Generator(device = device)
 train_class, test_class = torch.utils.data.random_split(all_data, (train_length, test_length), generator = generator)
 
 # Set up the data in batches
-dataloader_train = torch.utils.data.DataLoader(train_class, batch_size = 64, shuffle = True, generator = generator)
-dataloader_test = torch.utils.data.DataLoader(test_class, batch_size = 64, shuffle = True, generator = generator)
+dataloader_train = torch.utils.data.DataLoader(train_class, batch_size = 32, shuffle = True, generator = generator)
+dataloader_test = torch.utils.data.DataLoader(test_class, batch_size = 32, shuffle = True, generator = generator)
 
 # Set up the models
 # Determine the number of abundance features by removing the non-abundance columns (sample index, time, 4 sampled parameters)
@@ -152,12 +154,13 @@ time_emulator = architecture.TimeEmulator(latent_dim = latent_dim, hidden_layer_
                                           num_hidden_layers = num_hidden_layers).to(device)
 torch.autograd.set_detect_anomaly(True) # To detect anomalies
 # Train the model using function from "model_training" module
+num_epochs = 3
 train_losses, test_losses = model_training.training(encoder = encoder, decoder = decoder, 
                                                     time_emulator = time_emulator,
                                                     train_batches = dataloader_train, 
                                                     test_batches = dataloader_test, 
-                                                    device = device, learning_rate = 0.01, 
-                                                    epochs = 100) # Parameters
+                                                    device = device, learning_rate = 0.003, 
+                                                    epochs = num_epochs) # Parameters
 
 # Extract value of the train and test loss at each epoch
 tr_loss = [x.item() for x in train_losses]
@@ -167,7 +170,7 @@ print('Training loss: ', tr_loss)
 print('Test loss: ', te_loss)
 
 # Plot the loss curve
-epochs = np.arange(1, 11)
+epochs = np.arange(1, num_epochs + 1)
 plt.plot(epochs, tr_loss, label = 'Training loss') # Plot training and test loss (vs epoch number)
 plt.plot(epochs, te_loss, label = 'Test loss')
 plt.yscale('log') # Loss function on a log-scale
