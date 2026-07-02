@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from itertools import chain
 import numpy as np
+import gc
 import preprocessing # Need dt scaling function from preprocessing module
 
 # Define the loss function (as an instance of nn.Module)
@@ -72,6 +73,13 @@ def iterate_time_emulator_twice(time_emulator, initial_latents, dt, device, dt_m
     evolved_input[:, 4:] = evolved_latents_1
     # Apply the model again
     evolved_latents_2 = time_emulator((evolved_input, scaled_step_2))
+
+    # Delete created tensors
+    del ratio, step_1_length, scaled_step_1, step_2_length, scaled_step_2, evolved_latents_1, evolved_input
+    # Clear cache
+    gc.collect()
+    torch.cuda.empty_cache()
+
     return evolved_latents_2 # Return last predicted abundance value
 
 # Training process in each epoch
@@ -142,6 +150,7 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         # Remove the loaded tensors
         del initial, dt, target, physical_params, initial_abundances, initial_latents, initial_for_te, evolved_latents, pred
         # Clear the cache
+        gc.collect()
         torch.cuda.empty_cache()
 
         # Print loss every 100 batches
@@ -216,6 +225,7 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
             # Remove the loaded tensors
             del initial, dt, target, physical_params, initial_abundances, initial_latents, initial_for_te, evolved_latents, pred
             # Clear the cache
+            gc.collect()
             torch.cuda.empty_cache()
 
     # Calculate average loss
