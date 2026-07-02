@@ -139,6 +139,11 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         # Reset the gradients before the next step
         optimizer.zero_grad()
 
+        # Remove the loaded tensors
+        del initial, dt, target, physical_params, initial_abundances, initial_latents, initial_for_te, evolved_latents, pred
+        # Clear the cache
+        torch.cuda.empty_cache()
+
         # Print loss every 100 batches
         if batch % 100 == 0:
             print('Loss: %.4f' % loss.item())
@@ -207,6 +212,11 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
             batch_loss = loss_function(target.to(device), pred)
             # Add this to the total loss
             total_loss += batch_loss
+
+            # Remove the loaded tensors
+            del initial, dt, target, physical_params, initial_abundances, initial_latents, initial_for_te, evolved_latents, pred
+            # Clear the cache
+            torch.cuda.empty_cache()
 
     # Calculate average loss
     avg_loss = total_loss / len(test_batches)

@@ -7,6 +7,7 @@ import pandas as pd # Pandas for dataframe handling
 import numpy as np # Numpy for math
 import torch # Torch for ML
 import itertools # Iteration tools
+import gc # Memory management
 import matplotlib.pyplot as plt # Plotting
 # Use ML pipeline set up here
 import architecture # ML model architecture
@@ -108,6 +109,8 @@ for sample_index in range(num_runs):
     # Append each dataframe to the appropriate list
     initial_dfs_list.append(initial_data)
     final_dfs_list.append(final_data)
+    # Delete the filtered_run object to clear up memory
+    del filtered_run
 # Combine the dataframes in each list
 all_initial_data = pd.concat(initial_dfs_list)
 all_final_data = pd.concat(final_dfs_list)
@@ -117,6 +120,9 @@ final_tensor = torch.from_numpy(all_final_data.values).to(dtype = torch.float32)
 # Scale them to the interval [-1, 1] using the function from preprocessing.py
 scaled_initial = preprocessing.scale_features(initial_tensor)
 scaled_final = preprocessing.scale_features(final_tensor)
+# Delete filtered_data to clear memory
+del filtered_data
+gc.collect()
 
 # Package data in the AbunAfterDt class defined in preprocessing.py
 # Get needed tensors
