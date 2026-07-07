@@ -36,8 +36,8 @@ def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, d
     opt_depth = 1e-3 # Optical depth at 100 micrometers
     nu_0 = 3e15 # Characteristic frequency
     T_dust = np.power(8.9e-11 * G0_UV * nu_0 * np.exp(-1.8 * A_V) + 
-                      (2.78 ** 5) + 3.4e-2 * (0.42 - opt_depth * (T_0 ** 6) * 
-                                              np.log(3.5e-2 * opt_depth * T_0)),
+                      (2.78 ** 5) + 3.4e-2 * opt_depth * (T_0 ** 6) * 
+                      (0.42 - 1 * np.log(3.5e-2 * opt_depth * T_0)),
                       0.2)
     # Calculate f_H2 from the fitting formula of Polzin et al. 2024
     # Needed parameters
