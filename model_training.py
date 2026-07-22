@@ -131,7 +131,10 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         initial_for_te[:, 4:] = initial_latents.clone()
         '''
         # Apply time emulator iteratively to evolve latents
-        evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
+        #evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
+        # Apply time emulator once (hopefully this speeds up training)
+        scaled_timestep = preprocessing.scale_dt(dt, dt_min = dt_min, dt_max = dt_max).to(device)
+        evolved_latents = time_emulator((initial_for_te.to(device), scaled_timestep))
         # Apply decoder to get predict evolved abundances
         pred = decoder(evolved_latents)
 
