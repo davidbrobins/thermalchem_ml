@@ -29,13 +29,14 @@ class ReconstructionLoss(nn.Module):
 
         # Unscale the abundances
         min_log_y = np.log10(min_abundance) # Get minimum value of log10(y_i)
-        input_abuns = (min_log_y / 2) - ((min_log_y / 2)  * input) # Unscale inputs
-        target_abuns = (min_log_y / 2) - ((min_log_y / 2) * target)
+        #input_abuns = (min_log_y / 2) - ((min_log_y / 2)  * input) # Unscale inputs
+        #target_abuns = (min_log_y / 2) - ((min_log_y / 2) * target)
 
         # Set a small threshold to avoid 0 losses
         epsilon = 1e-8
         # Square the difference between input and target for each feature (adding threshold to avoid nans in backwards pass)
-        squared_deviations = torch.pow(input_abuns - target_abuns + epsilon, 2)
+        # multiply by (min_log_y / 2)^2 to convert back to physical space
+        squared_deviations = torch.pow(input - target+ epsilon, 2) * ((min_log_y / 2) ** 2)
         # Get the mean (averaged over the number of features)
         error = torch.mean(squared_deviations)
         # Return the result
@@ -240,7 +241,7 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
 
 # Define entire training procedure
 def training(encoder, decoder, time_emulator, train_batches, test_batches, device,
-             learning_rate = 1e-3, epochs = 100, dt_min = 1e1, dt_max = 1e8):
+             learning_rate = 0.03, epochs = 100, dt_min = 1e1, dt_max = 1e8):
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
@@ -249,7 +250,7 @@ def training(encoder, decoder, time_emulator, train_batches, test_batches, devic
     train_batches (torch.tensor): tensor containing features for training data (grouped in batches)
     test_batches (torch.tensor): tensor containing features for test data (grouped in batches)
     device (str): "cpu" or torch.accelerator.current_accelerator()
-    learning_rate (float): scalar multiplying gradient in weight updates
+    learning_rate (float): initial scalar multiplying gradient in weight updates
     epochs (int): number of train-test cycles (each uses all train and test batches)
     dt_min (float): minimum timestep in years (defaults to 10)
     dt_max (float): maximum timestep in years (defaults to 1e8)
@@ -260,7 +261,9 @@ def training(encoder, decoder, time_emulator, train_batches, test_batches, devic
 
     # Set up ADAM optimizer to update encoder and decoder parameters
     optimizer = torch.optim.Adam(params = chain(encoder.parameters(), time_emulator.parameters(), decoder.parameters()),
-                                 lr = learning_rate)
+                                 lr = learning_rate, fused = True)
+    # Set up a learning rate scheduler to decay learning rate by 5% every epoch
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma = 0.95)
     
     # Set up the loss function as the reconstruction loss defined above
     loss_function = ReconstructionLoss()
@@ -279,6 +282,8 @@ def training(encoder, decoder, time_emulator, train_batches, test_batches, devic
         # Testing step
         test_loss = testing_step(encoder, decoder, time_emulator, test_batches, loss_function, device, dt_min = dt_min, dt_max = dt_max)
         test_losses.append(test_loss) # Add this to the appropriate array
+        # Step the learning rate scheduler
+        scheduler.step()
 
         # Clear the cache
         torch.cuda.empty_cache()

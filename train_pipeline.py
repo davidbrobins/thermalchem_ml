@@ -165,7 +165,7 @@ train_losses, test_losses = model_training.training(encoder = encoder, decoder =
                                                     time_emulator = time_emulator,
                                                     train_batches = dataloader_train, 
                                                     test_batches = dataloader_test, 
-                                                    device = device, learning_rate = 0.003, 
+                                                    device = device, learning_rate = 0.03, 
                                                     epochs = num_epochs) # Parameters
 
 # Extract value of the train and test loss at each epoch
