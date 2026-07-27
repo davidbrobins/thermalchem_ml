@@ -123,19 +123,13 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         initial_latents = encoder(initial_abundances)
         # Concatenate physical parameters (physical_params) and encoded abundances (initial latents)
         initial_for_te = torch.cat((physical_params, initial_latents), dim = 1)
-        '''
-        # Initialize tensor to pass to time_emulator [batch_size * (latent_dim + 4)]
-        initial_for_te = torch.zeros(len(dt), len(initial_latents[0]) + 4, requires_grad = True)
-        # First 4 columns are the physical paramaters from initial
-        initial_for_te[:, :4] = initial[:, :4].clone()
-        # Remaining columns are the encoded abundances
-        initial_for_te[:, 4:] = initial_latents.clone()
-        '''
         # Apply time emulator iteratively to evolve latents
-        #evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
+        evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
+        ''' # Move to test loop so we verify the model isn't learning something weird that works for two iterations but not one
         # Apply time emulator once (hopefully this speeds up training)
         scaled_timestep = preprocessing.scale_dt(dt, dt_min = dt_min, dt_max = dt_max).to(device)
         evolved_latents = time_emulator((initial_for_te.to(device), scaled_timestep))
+        '''
         # Apply decoder to get predict evolved abundances
         pred = decoder(evolved_latents)
 
@@ -209,14 +203,6 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
             initial_latents = encoder(initial_abundances)
             # Concatenate physical parameters (physical_params) and encoded abundances (initial latents)
             initial_for_te = torch.cat((physical_params, initial_latents), dim = 1)
-            '''
-            # Initialize tensor to pass to time_emulator [batch_size * (latent_dim + 4)]
-            initial_for_te = torch.zeros(len(dt), len(initial_latents[0]) + 4)
-            # First 4 columns are the physical paramaters from initial
-            initial_for_te[:, :4] = initial[:, :4]
-            # Remaining columns are the encoded abundances
-            initial_for_te[:, 4:] = initial_latents
-            '''
             # Iterate time emulator to evolve latent space features
             evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
             # Apply decoder to get predicted evolved abundances
@@ -240,8 +226,8 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
     return avg_loss
 
 # Define entire training procedure
-def training(encoder, decoder, time_emulator, train_batches, test_batches, device,
-             learning_rate = 0.03, epochs = 100, dt_min = 1e1, dt_max = 1e8):
+def training_loop(encoder, decoder, time_emulator, train_batches, test_batches, device,
+                  learning_rate = 0.03, epochs = 100, dt_min = 1e1, dt_max = 1e8):
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
@@ -291,3 +277,21 @@ def training(encoder, decoder, time_emulator, train_batches, test_batches, devic
     # Return the train and test loss arrays
     return train_losses, test_losses
     print('Done!')
+
+def ae_training_step():
+    pass
+
+def ae_testing_step():
+    pass
+
+def ae_training_loop():
+    pass
+
+def time_emulator_training_step():
+    pass
+
+def time_emulator_testing_step():
+    pass
+
+def time_emulator_training_loop():
+    pass

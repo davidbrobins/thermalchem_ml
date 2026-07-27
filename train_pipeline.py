@@ -161,12 +161,12 @@ time_emulator = architecture.TimeEmulator(latent_dim = latent_dim, hidden_layer_
 torch.autograd.set_detect_anomaly(True) # To detect anomalies
 # Train the model using function from "model_training" module
 num_epochs = 4
-train_losses, test_losses = model_training.training(encoder = encoder, decoder = decoder, 
-                                                    time_emulator = time_emulator,
-                                                    train_batches = dataloader_train, 
-                                                    test_batches = dataloader_test, 
-                                                    device = device, learning_rate = 0.03, 
-                                                    epochs = num_epochs) # Parameters
+train_losses, test_losses = model_training.training_loop(encoder = encoder, decoder = decoder, 
+                                                         time_emulator = time_emulator,
+                                                         train_batches = dataloader_train, 
+                                                         test_batches = dataloader_test, 
+                                                         device = device, learning_rate = 0.03, 
+                                                         epochs = num_epochs) # Parameters
 
 # Extract value of the train and test loss at each epoch
 tr_loss = [x.item() for x in train_losses]
