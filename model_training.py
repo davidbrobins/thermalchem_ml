@@ -125,11 +125,6 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
         initial_for_te = torch.cat((physical_params, initial_latents), dim = 1)
         # Apply time emulator iteratively to evolve latents
         evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
-        ''' # Move to test loop so we verify the model isn't learning something weird that works for two iterations but not one
-        # Apply time emulator once (hopefully this speeds up training)
-        scaled_timestep = preprocessing.scale_dt(dt, dt_min = dt_min, dt_max = dt_max).to(device)
-        evolved_latents = time_emulator((initial_for_te.to(device), scaled_timestep))
-        '''
         # Apply decoder to get predict evolved abundances
         pred = decoder(evolved_latents)
 
@@ -159,8 +154,6 @@ def training_step(encoder, decoder, time_emulator, train_batches, optimizer, los
     avg_loss = total_loss / len(train_batches)
     # Return this
     return avg_loss
-
-        
 
 # Testing process in each epoch
 def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, device, dt_min = 1e1, dt_max = 1e8): 
@@ -203,8 +196,10 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
             initial_latents = encoder(initial_abundances)
             # Concatenate physical parameters (physical_params) and encoded abundances (initial latents)
             initial_for_te = torch.cat((physical_params, initial_latents), dim = 1)
-            # Iterate time emulator to evolve latent space features
-            evolved_latents = iterate_time_emulator_twice(time_emulator, initial_for_te.to(device), dt, device = device, dt_min = dt_min, dt_max = dt_max)
+            # Apply time emulator ONCE (to check that training step doesn't learn 
+            # something weird that works for two iterations but not a single application)
+            scaled_timestep = preprocessing.scale_dt(dt, dt_min = dt_min, dt_max = dt_max).to(device) # Scale timestep
+            evolved_latents = time_emulator((initial_for_te.to(device), scaled_timestep)) # Apply time_emulator
             # Apply decoder to get predicted evolved abundances
             pred = decoder(evolved_latents)
             # Calculate loss in this batch
@@ -249,7 +244,7 @@ def training_loop(encoder, decoder, time_emulator, train_batches, test_batches, 
     optimizer = torch.optim.Adam(params = chain(encoder.parameters(), time_emulator.parameters(), decoder.parameters()),
                                  lr = learning_rate, fused = True)
     # Set up a learning rate scheduler to decay learning rate by 5% every epoch
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma = 0.95)
+    #scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma = 0.95)
     
     # Set up the loss function as the reconstruction loss defined above
     loss_function = ReconstructionLoss()
@@ -278,14 +273,171 @@ def training_loop(encoder, decoder, time_emulator, train_batches, test_batches, 
     return train_losses, test_losses
     print('Done!')
 
-def ae_training_step():
-    pass
+# Define training step for just the autoencoder
+def ae_training_step(encoder, decoder, train_batches, optimizer, loss_function, device):
+    '''
+    Inputs:
+    encoder (Encoder): instance of Encoder class defined in architecture.py
+    decoder (Decoder): instance of Decoder class defined in architecture.py
+    train_batches (torch.tensor): tensor containing features for training data (grouped in batches)
+    optimizer (torch.optim): optimizer used to update model weights in backpropagation
+    loss_function (torch.nn.Module): loss function comparing features and their autoencoder reconstruction
+    device (str): "cpu" or torch.accelerator.current_accelerator()
+    Outputs:
+    avg_loss (float): Average loss over the training batches
+    '''
 
-def ae_testing_step():
-    pass
+    # Set encoder and decoder to training mode
+    encoder.train()
+    decoder.train()
 
-def ae_training_loop():
-    pass
+    # Set up variable for the total loss
+    total_loss = 0
+
+    # Loop through training batches
+    for batch, features in enumerate(train_batches):
+        # Unpack initial, dt, and final tensors from features (see AbunAfterDt class in preprocessing.py)
+        initial = features[0][0]
+        dt = features[0][1]
+        target = features[1]
+
+        # Extract the (scaled) abundances in columns 4+ of initial 
+        initial_abundances = initial[:, 4:].to(device)
+        # Concatenate these (along axis 0) with the target abundances (so autoencoder training sees both initial and final states)
+        all_abundances = torch.cat((initial_abundances, target), dim = 0).to(device)
+
+        # Apply emulator to get latent features
+        latents = encoder(all_abundances)
+        # Apply decoder to get reconstruction of (scaled) abundances
+        reconstruction = decoder(latents)
+
+        # Calculate loss
+        loss = loss_function(all_abundances, reconstruction)
+        # Add this to the total loss
+        total_loss += loss
+
+        # Backpropagation
+        loss.backward()
+        # Apply optimizer to update weights
+        optimizer.step()
+        # Reset the gradients before the next step
+        optimizer.zero_grad()
+
+        # Remove the loaded tensors
+        del initial, dt, target, initial_abundances, all_abundances, latents, reconstruction
+        # Clear the cache
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        # Print loss every 100 batches
+        if batch % 100 == 0:
+            print('Loss: %.4f' % loss.item())
+
+    # Get the average loss
+    avg_loss = total_loss / len(train_batches)
+    # Return this
+    return avg_loss
+
+def ae_testing_step(encoder, decoder, test_batches, loss_function, device): 
+    '''
+    Inputs:
+    encoder (Encoder): instance of Encoder class defined in architecture.py
+    decoder (Decoder): instance of Decoder class defined in architecture.py
+    test_batches (torch.tensor): tensor containing features for testing data (grouped in batches)
+    loss_function (torch.nn.Module): loss function comparing features and their autoencoder reconstruction
+    device (str): "cpu" or torch.accelerator.current_accelerator()
+    Outputs:
+    avg_loss (float): Average loss over the test batches
+    '''
+
+    # Set all neural networks to evaluation mode
+    encoder.eval()
+    decoder.eval()
+    
+    # Sum variable to add up test loss for each batch
+    total_loss = 0
+    
+    # Loop through test batches
+    # WITHOUT calculating gradients
+    with torch.no_grad():
+        for batch, features in enumerate(test_batches):
+            # Unpack initial, dt, and final tensors from features (see AbunAfterDt class in preprocessing.py)
+            initial = features[0][0]
+            dt = features[0][1]
+            target = features[1]            
+    
+            # Extract the abundances from the input features (columns 6+) and pass to torch device
+            initial_abundances = initial[:, 4:].to(device)
+            # Concatenate these (along axis 0) with the target abundances (so autoencoder training sees both initial and final states)
+            all_abundances = torch.cat((initial_abundances, target), dim = 0).to(device)
+
+            # Apply encoder to get latent space representation
+            latents = encoder(all_abundances)
+            # Apply decoder to get predicted evolved abundances
+            reconstruction = decoder(latents)
+
+            # Calculate loss in this batch
+            batch_loss = loss_function(all_abundances, reconstruction)
+            # Add this to the total loss
+            total_loss += batch_loss
+    
+            # Remove the loaded tensors
+            del initial, dt, target, initial_abundances, all_abundances, latents, reconstruction
+            # Clear the cache
+            gc.collect()
+            torch.cuda.empty_cache()
+    
+    # Calculate average loss
+    avg_loss = total_loss / len(test_batches)
+    # Print this
+    print('Average test loss: %.4f' % avg_loss)
+    # Return the average loss
+    return avg_loss
+
+def ae_training_loop(encoder, decoder, train_batches, test_batches, device,
+                     learning_rate = 0.03, epochs = 100):
+    '''
+    Inputs:
+    encoder (Encoder): instance of Encoder class defined in architecture.py
+    decoder (Decoder): instance of Decoder class defined in architecture.py
+    train_batches (torch.tensor): tensor containing features for training data (grouped in batches)
+    test_batches (torch.tensor): tensor containing features for test data (grouped in batches)
+    device (str): "cpu" or torch.accelerator.current_accelerator()
+    learning_rate (float): initial scalar multiplying gradient in weight updates
+    epochs (int): number of train-test cycles (each uses all train and test batches)
+    Outputs:
+    train_losses (list of floats): List of the average training loss for each epoch
+    test_losses (list of floats): List of the average test loss for each epoch
+    '''
+
+    # Set up ADAM optimizer to update encoder and decoder parameters
+    optimizer = torch.optim.Adam(params = chain(encoder.parameters(), decoder.parameters()),
+                                 lr = learning_rate, fused = True)
+    
+    # Set up the loss function as the reconstruction loss defined above
+    loss_function = ReconstructionLoss()
+
+    # Set up arrays for the training and test loss 
+    train_losses = []
+    test_losses = []
+
+    # Loop through epochs
+    for epoch in range(epochs):
+        # Print epoch number to track progress
+        print('Epoch: %i' % (epoch + 1))
+        # Training step
+        train_loss = ae_training_step(encoder, decoder, train_batches, optimizer, loss_function, device)
+        train_losses.append(train_loss) # Add this to the appropriate array
+        # Testing step
+        test_loss = ae_testing_step(encoder, decoder, test_batches, loss_function, device)
+        test_losses.append(test_loss) # Add this to the appropriate array
+
+        # Clear the cache
+        torch.cuda.empty_cache()
+
+    # Return the train and test loss arrays
+    return train_losses, test_losses
+    print('Done!')
 
 def time_emulator_training_step():
     pass
