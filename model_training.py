@@ -295,6 +295,10 @@ def training_loop(encoder, decoder, time_emulator, train_batches, test_batches, 
     torch.save(best_encoder.state_dict(), 'encoder')
     torch.save(best_time_emulator.state_dict(), 'time_emulator')
     torch.save(best_decoder, 'decoder')
+    # Set each model to the best value
+    encoder = best_encoder
+    time_emulator = best_time_emulator
+    decoder = best_decoder
 
     # Return the train and test loss arrays
     return train_losses, test_losses
@@ -473,7 +477,10 @@ def ae_training_loop(encoder, decoder, train_batches, test_batches, device,
 
     # Save the best encoder and decoder
     torch.save(best_encoder.state_dict(), 'encoder')
-    torch.save(best_decoder.state_dict(), 'decoder')    
+    torch.save(best_decoder.state_dict(), 'decoder')  
+    # Set each model to the best version
+    encoder = best_encoder
+    decoder = best_decoder  
 
     # Return the train and test loss arrays
     return train_losses, test_losses
@@ -679,6 +686,7 @@ def time_emulator_training_loop(encoder, decoder, time_emulator, train_batches, 
 
     # Save the best emulator
     torch.save(best_time_emulator.state_dict(), 'time_emulator')
+    time_emulator = best_time_emulator
 
     # Return the train and test loss arrays
     return train_losses, test_losses
