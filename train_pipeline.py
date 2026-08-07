@@ -145,8 +145,8 @@ generator = torch.Generator(device = device)
 train_class, test_class = torch.utils.data.random_split(all_data, (train_length, test_length), generator = generator)
 
 # Set up the data in batches
-dataloader_train = torch.utils.data.DataLoader(train_class, batch_size = 32, shuffle = True, generator = generator)
-dataloader_test = torch.utils.data.DataLoader(test_class, batch_size = 32, shuffle = True, generator = generator)
+dataloader_train = torch.utils.data.DataLoader(train_class, batch_size = 256, shuffle = True, generator = generator)
+dataloader_test = torch.utils.data.DataLoader(test_class, batch_size = 256, shuffle = True, generator = generator)
 
 # Set up the models
 # Determine the number of abundance features by removing the non-abundance columns (sample index, time, 4 sampled parameters)
@@ -160,17 +160,25 @@ time_emulator = architecture.TimeEmulator(latent_dim = latent_dim, hidden_layer_
                                           num_hidden_layers = num_hidden_layers).to(device)
 torch.autograd.set_detect_anomaly(True) # To detect anomalies
 # Train the model using function from "model_training" module
-num_epochs = 4
-train_losses, test_losses = model_training.training_loop(encoder = encoder, decoder = decoder, 
-                                                         time_emulator = time_emulator,
-                                                         train_batches = dataloader_train, 
-                                                         test_batches = dataloader_test, 
-                                                         device = device, learning_rate = 0.03, 
-                                                         epochs = num_epochs) # Parameters
+num_epochs = 1
+print('Training autoencoder...')
+ae_train_losses, ae_test_losses = model_training.ae_training_loop(encoder = encoder, decoder = decoder,
+                                                                  train_batches = dataloader_train, 
+                                                                  test_batches = dataloader_test,
+                                                                  device = device, learning_rate = 0.003,
+                                                                  epochs = num_epochs)
+print('Training time emulator...')
+te_train_losses, te_test_losses = model_training.time_emulator_training_loop(encoder = encoder, decoder = decoder, 
+                                                                             time_emulator = time_emulator,
+                                                                             train_batches = dataloader_train, 
+                                                                             test_batches = dataloader_test, 
+                                                                             device = device, learning_rate = 0.003, 
+                                                                             epochs = num_epochs) # Parameters
+
 
 # Extract value of the train and test loss at each epoch
-tr_loss = [x.item() for x in train_losses]
-te_loss = [x.item() for x in test_losses]
+tr_loss = [x.item() for x in te_train_losses]
+te_loss = [x.item() for x in te_test_losses]
 # Save the values
 print('Training loss: ', tr_loss)
 print('Test loss: ', te_loss)
@@ -181,7 +189,7 @@ plt.plot(epochs, tr_loss, label = 'Training loss') # Plot training and test loss
 plt.plot(epochs, te_loss, label = 'Test loss')
 plt.yscale('log') # Loss function on a log-scale
 plt.xlabel('Epoch') # Label axes
-plt.ylabel('Reconstruction loss')
+plt.ylabel('Time emulator loss')
 #plt.suptitle('Latent dimension = ' + str(latent_dim)) # Title plot with latent space dimension
 plt.legend() # Legend showing loss type
 plt.savefig('test_full_pipeline_loss_curve.pdf') # Save the plot
