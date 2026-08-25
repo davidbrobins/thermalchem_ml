@@ -1,5 +1,5 @@
 # Script to train the full emulator pipeline
-# Usage: python train_pipeline.py samples_dir/ latent_dim hidden_layer_width num_hidden_layers substeps
+# Usage: python train_pipeline.py samples_dir/ num_runs latent_dim hidden_layer_width num_hidden_layers substeps
 
 # Import statements
 import sys # Command line arguments
