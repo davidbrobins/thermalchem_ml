@@ -75,7 +75,7 @@ initial_dfs_list = []
 final_dfs_list = []
 # Define parameters for selecting time-pairs 
 min_delta_t = 10 # Minimum delta_t value, in years (yr)
-num_pairs_per_run = 500 # Number of pairs per run # NOTE: reduced to avoid memory issues
+num_pairs_per_run = 500 # Number of pairs per run 
 # Loop through chempl runs
 for sample_index in range(num_runs): 
     print('Pair loop number: ', sample_index)
@@ -86,7 +86,7 @@ for sample_index in range(num_runs):
     # Get first and second elements of each pair
     first_index = index_pairs[:, 0]
     second_index = index_pairs[:, 1]
-    # Get delta_t (in years) for each pair (neeed to reset indices to allow subtraction)
+    # Get delta_t (in years) for each pair (need to reset indices to allow subtraction)
     delta_t_vals = filtered_run['Time'].iloc[second_index].reset_index(drop = True) - filtered_run['Time'].iloc[first_index].reset_index(drop = True)
     # Get indices for pairs where delta_t is above the minimum threshold defined above
     restricted_index = delta_t_vals.loc[delta_t_vals > min_delta_t].index

@@ -232,7 +232,7 @@ def testing_step(encoder, decoder, time_emulator, test_batches, loss_function, d
 
 # Define entire training procedure
 def training_loop(encoder, decoder, time_emulator, train_batches, test_batches, device,
-                  learning_rate = 0.03, epochs = 100, dt_min = 1e1, dt_max = 1e8):
+                  learning_rate = 0.03, epochs = 100, dt_min = 1e1, dt_max = 1e8, to_save = True):
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
@@ -245,6 +245,7 @@ def training_loop(encoder, decoder, time_emulator, train_batches, test_batches, 
     epochs (int): number of train-test cycles (each uses all train and test batches)
     dt_min (float): minimum timestep in years (defaults to 10)
     dt_max (float): maximum timestep in years (defaults to 1e8)
+    to_save (bool): whether or not to save the best-performing model
     Outputs:
     train_losses (list of floats): List of the average training loss for each epoch
     test_losses (list of floats): List of the average test loss for each epoch
@@ -291,10 +292,11 @@ def training_loop(encoder, decoder, time_emulator, train_batches, test_batches, 
         # Clear the cache
         torch.cuda.empty_cache()
 
-    # Save the models from epoch with best test loss
-    torch.save(best_encoder.state_dict(), 'encoder')
-    torch.save(best_time_emulator.state_dict(), 'time_emulator')
-    torch.save(best_decoder, 'decoder')
+    # Save the models from epoch with best test loss if to_save flag is True
+    if to_save == True:
+        torch.save(best_encoder.state_dict(), 'encoder')
+        torch.save(best_time_emulator.state_dict(), 'time_emulator')
+        torch.save(best_decoder, 'decoder')
     # Set each model to the best value
     encoder = best_encoder
     time_emulator = best_time_emulator
@@ -424,7 +426,7 @@ def ae_testing_step(encoder, decoder, test_batches, loss_function, device):
     return avg_loss
 
 def ae_training_loop(encoder, decoder, train_batches, test_batches, device,
-                     learning_rate = 0.03, epochs = 100):
+                     learning_rate = 0.03, epochs = 100, to_save = True):
     '''
     Inputs:
     encoder (Encoder): instance of Encoder class defined in architecture.py
@@ -434,6 +436,7 @@ def ae_training_loop(encoder, decoder, train_batches, test_batches, device,
     device (str): "cpu" or torch.accelerator.current_accelerator()
     learning_rate (float): initial scalar multiplying gradient in weight updates
     epochs (int): number of train-test cycles (each uses all train and test batches)
+    to_save (bool): whether or not to save best-performing models
     Outputs:
     train_losses (list of floats): List of the average training loss for each epoch
     test_losses (list of floats): List of the average test loss for each epoch
@@ -475,9 +478,10 @@ def ae_training_loop(encoder, decoder, train_batches, test_batches, device,
         # Clear the cache
         torch.cuda.empty_cache()
 
-    # Save the best encoder and decoder
-    torch.save(best_encoder.state_dict(), 'encoder')
-    torch.save(best_decoder.state_dict(), 'decoder')  
+    # Save the models from epoch with best test loss if to_save flag is True
+    if to_save == True:
+        torch.save(best_encoder.state_dict(), 'encoder')
+        torch.save(best_decoder.state_dict(), 'decoder')  
     # Set each model to the best version
     encoder = best_encoder
     decoder = best_decoder  
@@ -627,7 +631,7 @@ def time_emulator_testing_step(encoder, decoder, time_emulator, test_batches, lo
     return avg_loss
 
 def time_emulator_training_loop(encoder, decoder, time_emulator, train_batches, test_batches, device,
-                                learning_rate = 0.03, epochs = 100, dt_min = 1e1, dt_max = 1e8):
+                                learning_rate = 0.03, epochs = 100, dt_min = 1e1, dt_max = 1e8, to_save = True):
     '''
     Inputs:
     encoder (Encoder): trained instance of Encoder class defined in architecture.py
@@ -640,6 +644,7 @@ def time_emulator_training_loop(encoder, decoder, time_emulator, train_batches, 
     epochs (int): number of train-test cycles (each uses all train and test batches)
     dt_min (float): minimum timestep in years (defaults to 10)
     dt_max (float): maximum timestep in years (defaults to 1e8)
+    to_save (bool): whether or not to save best performing model
     Outputs:
     train_losses (list of floats): List of the average training loss for each epoch
     test_losses (list of floats): List of the average test loss for each epoch
@@ -684,8 +689,9 @@ def time_emulator_training_loop(encoder, decoder, time_emulator, train_batches, 
         # Clear the cache
         torch.cuda.empty_cache()
 
-    # Save the best emulator
-    torch.save(best_time_emulator.state_dict(), 'time_emulator')
+    # Save the models from epoch with best test loss if to_save flag is True
+    if to_save == True:
+        torch.save(best_time_emulator.state_dict(), 'time_emulator')
     time_emulator = best_time_emulator
 
     # Return the train and test loss arrays
