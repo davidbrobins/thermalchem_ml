@@ -36,6 +36,7 @@ def hp_val_loss(config, data = None, device = None):
         dataloader_opt = torch.utils.data.DataLoader(opt_class, batch_size = 256, shuffle = True, generator = generator)
 
         # Train autoencoder
+        print('Training autoencoder...')
         ae_opt_losses, ae_eval_losses = model_training.ae_training_loop(encoder = encoder, 
                                                                         decoder = decoder,
                                                                         train_batches = dataloader_opt, 
@@ -44,7 +45,7 @@ def hp_val_loss(config, data = None, device = None):
                                                                         learning_rate = config['learning_rate'],
                                                                         epochs = 5, # Shorter for hyperaprameter validation
                                                                         to_save = False) # Do not save models
-
+        print('Training time emulator...')
         # Train time emulator
         te_opt_losses, te_eval_losses = model_training.time_emulator_training_loop(encoder = encoder, 
                                                                                    decoder = decoder, 

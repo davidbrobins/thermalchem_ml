@@ -165,7 +165,7 @@ val_class, train_class = torch.utils.data.random_split(train_val_class, (val_len
 with_params = tune.with_parameters(hp_val_tools.hp_val_loss, data = val_class, device = device) # Wrap function with parameters
 with_resources = tune.with_resources(with_params, resources = {'cpu': 16, 'gpu': 1}) # Wrap again with resources to use
 tuner = tune.Tuner(with_resources, # Function reporting error
-                   tune_config = tune.TuneConfig(metric = 'loss', mode = 'min', num_samples = 3, 
+                   tune_config = tune.TuneConfig(metric = 'loss', mode = 'min', num_samples = 100, 
                                                  search_alg = OptunaSearch()), 
                    param_space = search_space) # Search space
 
