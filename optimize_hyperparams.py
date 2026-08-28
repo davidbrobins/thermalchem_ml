@@ -232,7 +232,7 @@ ae_train_losses, ae_test_losses = model_training.ae_training_loop(encoder = best
                                                                   test_batches = dataloader_test,
                                                                   device = device, 
                                                                   learning_rate = best_hyperparams['learning_rate'],
-                                                                  epochs = num_epochs) # Parameters
+                                                                  epochs = num_epochs) # Parametersc
 print('Training time emulator...')
 te_train_losses, te_test_losses = model_training.time_emulator_training_loop(encoder = best_encoder, 
                                                                              decoder = best_decoder, 
