@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt # Plotting
 import architecture # ML model architecture
 import model_training # Training
 import preprocessing # Feature scaling
+import hp_val_tools # Hyperparameter validation tools
 
 # Define the search space
 search_space = {'learning_rate' : tune.loguniform(1e-3, 1e-1), # Learning rate for training
@@ -161,7 +162,7 @@ train_val_class, test_class = torch.utils.data.random_split(all_data, (train_val
 val_class, train_class = torch.utils.data.random_split(train_val_class, (val_length, train_length), generator = generator)
 
 # Set up the hyperparameter search
-with_params = tune.with_parameters(objective, data = val_class, device = device) # Wrap function with parameters
+with_params = tune.with_parameters(hp_val_tools.hp_val_loss, data = val_class, device = device) # Wrap function with parameters
 with_resources = tune.with_resources(with_params, resources = {'cpu': 16, 'gpu': 1}) # Wrap again with resources to use
 tuner = tune.Tuner(with_resources, # Function reporting error
                    tune_config = tune.TuneConfig(metric = 'loss', mode = 'min', num_samples = 3, 
