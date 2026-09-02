@@ -19,10 +19,10 @@ import preprocessing # Feature scaling
 import hp_val_tools # Hyperparameter validation tools
 
 # Define the search space
-search_space = {'learning_rate' : tune.loguniform(1e-3, 1e-1), # Learning rate for training
+search_space = {'learning_rate' : tune.loguniform(1e-3, 1e-2), # Learning rate for training
                 'latent_dim' : tune.randint(6, 31), # Dimension of autoencoder latent space
-                'hidden_layer_width' : tune.randint(10, 41), # Width of time emulator hidden layers
-                'num_hidden_layers' : tune.randint(2, 7) # Number of hidden layers in time emulator
+                'hidden_layer_width' : tune.randint(10, 51), # Width of time emulator hidden layers
+                'num_hidden_layers' : tune.randint(2, 9) # Number of hidden layers in time emulator
                 }
 
 # Unpack command line arguments
@@ -185,6 +185,7 @@ plt.figure()
 plt.scatter(results_df['config/learning_rate'], results_df['loss'])
 plt.xlabel('Learning rate')
 plt.xscale('log')
+plt.yscale('log')
 plt.ylabel('Reconstruction loss')
 plt.savefig('hp_opt_learning_rate.pdf')
 plt.close()
@@ -193,6 +194,7 @@ plt.figure()
 plt.scatter(results_df['config/latent_dim'], results_df['loss'])
 plt.xlabel(r'Latent space dimensionality $d_\mathrm{latent}$')
 plt.ylabel('Reconstruction loss')
+plt.yscale('log')
 plt.savefig('hp_opt_latent_dim.pdf')
 plt.close()
 
@@ -200,6 +202,7 @@ plt.figure()
 plt.scatter(results_df['config/hidden_layer_width'], results_df['loss'])
 plt.xlabel(r'Time emulator hidden layer width $w_\mathrm{hidden}$')
 plt.ylabel('Reconstruction loss')
+plt.yscale('log')
 plt.savefig('hp_opt_hidden_layer_width.pdf')
 plt.close()
 
@@ -207,6 +210,7 @@ plt.figure()
 plt.scatter(results_df['config/num_hidden_layers'], results_df['loss'])
 plt.xlabel(r'Number of time emulator hidden layers $N_\mathrm{hidden}$')
 plt.ylabel('Reconstruction loss')
+plt.yscale('log')
 plt.savefig('hp_opt_num_hidden_layers.pdf')
 plt.close()
 
@@ -246,20 +250,36 @@ te_train_losses, te_test_losses = model_training.time_emulator_training_loop(enc
 
 
 # Extract value of the train and test loss at each epoch
-tr_loss = [x.item() for x in te_train_losses]
-te_loss = [x.item() for x in te_test_losses]
+ae_train_loss = [x.item() for x in ae_train_losses]
+ae_test_loss = [x.item() for x in ae_test_losses]
 # Save the values
-print('Training loss: ', tr_loss)
-print('Test loss: ', te_loss)
+print('Autoencoder training loss: ', ae_train_loss)
+print('Autoencoder test loss: ', ae_test_loss)
+te_train_loss = [x.item() for x in te_train_losses]
+te_test_loss = [x.item() for x in te_test_losses]
+# Save the values
+print('Time emulator training loss: ', te_train_loss)
+print('Time emulator test loss: ', te_test_loss)
 
-# Plot the loss curve
+# Plot the loss curve for both autoencoder and time emulator
 epochs = np.arange(1, num_epochs + 1)
-plt.plot(epochs, tr_loss, label = 'Training loss') # Plot training and test loss (vs epoch number)
-plt.plot(epochs, te_loss, label = 'Test loss')
+plt.figure()
+plt.plot(epochs, ae_train_loss, label = 'Training loss') # Plot training and test loss (vs epoch number)
+plt.plot(epochs, ae_test_loss, label = 'Test loss')
 plt.yscale('log') # Loss function on a log-scale
 plt.xlabel('Epoch') # Label axes
-plt.ylabel('Time emulator loss')
-#plt.suptitle('Latent dimension = ' + str(latent_dim)) # Title plot with latent space dimension
+plt.ylabel('Reconstruction loss')
+plt.suptitle('Autoencoder loss curve') # Title plot with latent space dimension
 plt.legend() # Legend showing loss type
-plt.savefig('full_pipeline_loss_curve.pdf') # Save the plot
+plt.savefig('full_pipeline_ae_loss_curve.pdf') # Save the plot
+plt.close()
+plt.figure()
+plt.plot(epochs, te_train_loss, label = 'Training loss') # Plot training and test loss (vs epoch number)
+plt.plot(epochs, te_test_loss, label = 'Test loss')
+plt.yscale('log') # Loss function on a log-scale
+plt.xlabel('Epoch') # Label axes
+plt.ylabel('Reconstruction loss')
+plt.suptitle('Time emulator loss curve') # Title plot with latent space dimension
+plt.legend() # Legend showing loss type
+plt.savefig('full_pipeline_te_loss_curve.pdf') # Save the plot
 plt.close()
