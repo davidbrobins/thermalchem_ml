@@ -8,6 +8,14 @@ import model_training # model_training module defining training loops for ML mod
 
 # Define objective function with 5-vold cross validation
 def hp_val_loss(config, data = None, device = None):
+    '''
+    Inputs:
+    config (dict): dictionary containing hyperparameters
+    data (preprocessing.AbunAfterDt): instance of AbunAfterDt class from preprocessing.py
+    device (torch.device): torch device (CUDA device if available, otherwise 'cpu')
+    Outputs:
+    losses (dict): dictionary containing 'loss', the evaluation set loss averaged over each fold
+    '''
     generator = torch.Generator(device = 'cpu') # Just a check
     # Set up models 
     # Get number of features
