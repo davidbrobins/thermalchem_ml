@@ -27,16 +27,13 @@ class ReconstructionLoss(nn.Module):
         error (float): The mean squared error
         '''
 
-        # Unscale the abundances
         min_log_y = np.log10(min_abundance) # Get minimum value of log10(y_i)
-        #input_abuns = (min_log_y / 2) - ((min_log_y / 2)  * input) # Unscale inputs
-        #target_abuns = (min_log_y / 2) - ((min_log_y / 2) * target)
 
         # Set a small threshold to avoid 0 losses
         epsilon = 1e-8
         # Square the difference between input and target for each feature (adding threshold to avoid nans in backwards pass)
         # multiply by (min_log_y / 2)^2 to convert back to physical space
-        squared_deviations = torch.pow(input - target+ epsilon, 2) * ((min_log_y / 2) ** 2)
+        squared_deviations = torch.pow(input - target + epsilon, 2) * ((min_log_y / 2) ** 2)
         # Get the mean (averaged over the number of features)
         error = torch.mean(squared_deviations)
         # Return the result
