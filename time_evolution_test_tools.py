@@ -49,14 +49,15 @@ def load_optimal_models(model_path):
 
 
 # Function 
-def constant_params_test(T_gas, n_gas, G0_UV, cell_thickness, save_path, run_name, 
-                         encoder, decoder, time_emulator, to_plot = True):
+def constant_params_test(T_gas, n_gas, G0_UV, cell_thickness, end_time, save_path, 
+                         run_name, encoder, decoder, time_emulator, to_plot = True):
     '''
     Inputs:
     T_gas (float): gas temperature, in K
     n_gas (float): gas number density, in cm^-3
     G0_UV (float): radiation field strenght, unitless
     cell_thickness (float): cell size, in pc
+    end_time (float): end time, in years
     save_path (str): directory path where results should be saved
     run_name (str): descriptive name for this run
     encoder (Encoder): trained instance of Encoder class in architecture.py
@@ -78,7 +79,7 @@ def constant_params_test(T_gas, n_gas, G0_UV, cell_thickness, save_path, run_nam
     # Create chempl files with desired parameters
     sampling_tools.generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness,
                                          metallicity = 1, dir_path = save_path + run_name + '/', 
-                                         t_max_year = 1e6 # Only run for 1 Myr
+                                         t_max_year = end_time # Only run for 1 Myr
                                          )
     # Get correct run file
     run_file = save_path + run_name + '/run_file.dat'
