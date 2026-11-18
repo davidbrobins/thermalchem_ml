@@ -8,7 +8,7 @@ import pandas as pd # Pandas for dataframe handling
 from pathlib import Path # To make nexted directories to store chempl files
 
 # Function to generate files for Chempl run (physical parameters, initial conditions, and a runfile) from sampled parameters
-def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, dir_path, specific_abundances = {}):
+def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, dir_path, specific_abundances = {}, t_max_year = 1e8):
     '''
     Inputs:
     T_gas (float): Gas temperature [K]
@@ -18,6 +18,7 @@ def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, d
     metallicity (float): Initial metallicity in units of Z/Z_sun
     dir_path (str): Path to the directory where the files will be written (should be an absolute path)
     specific_abundances (dir): Dictionary containing any desired initial chemical abundances that differ from the overall metallicity (defaults to an empty dictionary)
+    t_max_year (float): End time (in years, defaults to 1e8, equivalent to 100 Myr)
     Outputs:
     None (writes file containing physical parameters for chempl run to file_path)
     '''
@@ -82,7 +83,7 @@ def generate_chempl_files(T_gas, n_gas, G0_UV, cell_thickness_pc, metallicity, d
     f.write('Ncol_H2 = ' + str(N_H2) + '\n') # Write calculated H2 column density
     f.write('Av = ' + str(A_V) + '\n') # Write calculated dust extinction
     f.write('T_dust = ' + str(T_dust) + '\n') # Write calculated dust temperature
-    f.write('t_max_year = 1e8') # Write t_stop = 10^8 yr
+    f.write('t_max_year = ' + str(t_max_year)) # Write t_stop = 10^8 yr
     f.close() # Close the file
 
     # Set the initial abundances
